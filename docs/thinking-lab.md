@@ -150,4 +150,4 @@ Reasoning can improve the task without becoming account evidence.
 - [Steering thinking and cost](https://platform.claude.com/docs/en/build-with-claude/thinking-steering-and-cost)
 - [Models API](https://platform.claude.com/docs/en/api/models)
 - [Models overview and capabilities](https://platform.claude.com/docs/en/models/overview)
-- [Reviewed workshop capability snapshot](https://github.com/cfregly/northstar-workshop/blob/93885372b0575c89a1fdafc669c7a4c840d3cf97/docs/model-capabilities.json)
+- [Reviewed workshop capability snapshot](https://github.com/cfregly/learn-claude-workshop/blob/93885372b0575c89a1fdafc669c7a4c840d3cf97/docs/model-capabilities.json)

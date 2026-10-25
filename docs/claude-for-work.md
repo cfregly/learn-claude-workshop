@@ -12,7 +12,7 @@ Northstar Freight, every person, and every record in this lab are fictional. Use
 4. Copy the four files below into Project knowledge as separate Markdown files. No connector or integration setup is needed.
 5. Add the project instructions, start one chat, and choose one role task.
 
-The reviewed source pack is also available in [GitHub](https://github.com/cfregly/northstar-workshop/blob/main/docs/northstar-source-pack.md).
+The reviewed source pack is also available in [GitHub](https://github.com/cfregly/learn-claude-workshop/blob/main/docs/northstar-source-pack.md).
 
 ## Four synthetic files
 
