@@ -10,7 +10,7 @@ Thinking can help with a difficult task. It is neither the final answer nor proo
 
 ### 1. Check the selected model
 
-Read `capabilities.thinking.types` from `GET /v1/models/{model_id}` or the [saved workshop snapshot](#material/model-capabilities). Do not infer from the model name.
+Read `capabilities.thinking.types` from `GET /v1/models/{model_id}` or the [saved workshop snapshot](https://learn.fluxcapacitor.dev/#material/model-capabilities). Do not infer from the model name.
 
 ```json
 {
