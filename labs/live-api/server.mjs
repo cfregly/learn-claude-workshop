@@ -31,6 +31,10 @@ export function createServer(options = {}) {
         const result = await liveDemo.handle(request)
         return send(result.statusCode,JSON.stringify(result.body),{'Content-Type':'application/json','Cache-Control':'no-store',...(result.headers||{})})
       }
+      if(pathname==='/api/ask') {
+        const result = await liveDemo.handleAsk(request)
+        return send(result.statusCode,JSON.stringify(result.body),{'Content-Type':'application/json','Cache-Control':'no-store',...(result.headers||{})})
+      }
       if(pathname==='/api/health') {
         if(!['GET','HEAD'].includes(request.method)) return send(405,'Method not allowed',{'Allow':'GET, HEAD'})
         const demo = await liveDemo.capabilities()

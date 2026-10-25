@@ -60,3 +60,5 @@ The API notebook and default client use only synthetic data. Do not place creden
 ## Audience adaptations
 
 Use the [Claude for Work activity](docs/claude-for-work.md) for a private Project and role task. Compare the [incomplete response lesson](docs/incomplete-response.md) to see how engineers and sales managers judge the same failure through different evidence. The [live API lab](labs/live-api/README.md) contains the actual server, bounded Claude request handler, and focused tests used by the site.
+
+Follow the [streaming and tool-use trace](docs/streaming-lab.md), then use the [thinking lesson](docs/thinking-lab.md) to distinguish model capabilities, effort, output budget, display, and preserved tool-turn blocks. The [capability excerpt](docs/model-capabilities.json) is dated evidence from the Models API.
