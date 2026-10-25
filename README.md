@@ -56,3 +56,7 @@ python3 -m unittest discover -s tests -q
 ```
 
 The API notebook and default client use only synthetic data. Do not place credentials, customer data, or private interview notes in this repository.
+
+## Audience adaptations
+
+Use the [Claude for Work activity](docs/claude-for-work.md) for a private Project and role task. Compare the [incomplete response lesson](docs/incomplete-response.md) to see how engineers and sales managers judge the same failure through different evidence. The [live API lab](labs/live-api/README.md) contains the actual server, bounded Claude request handler, and focused tests used by the site.
