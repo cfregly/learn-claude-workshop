@@ -69,6 +69,31 @@ function postThroughPublicHost(origin, body) {
   })
 }
 
+function abortPostBody(origin) {
+  const target = new URL(origin)
+  return new Promise(resolve => {
+    const request = http.request({
+      host: target.hostname,
+      port: target.port,
+      path: '/api/demo',
+      method: 'POST',
+      headers: {
+        Host: target.host,
+        Origin: origin,
+        'Content-Type': 'application/json',
+        'Content-Length': 200,
+        'Sec-Fetch-Site': 'same-origin'
+      }
+    }, response => {
+      response.resume()
+      response.once('end', () => resolve({ status: response.statusCode }))
+    })
+    request.once('error', error => resolve({ error }))
+    request.write('{"role_id":"account-executive",')
+    setImmediate(() => request.destroy(new Error('intentional test abort')))
+  })
+}
+
 function successResponse(text = 'CONFIRMED: Renewal is January 31, 2027 [CRM].') {
   return new Response(JSON.stringify({
     id: 'msg_test',
@@ -205,6 +230,42 @@ test('rejects cross-site and arbitrary input before spending the budget', async 
   assert.equal(oversized.status, 413)
   assert.equal(providerCalls, 0)
   await assert.rejects(readFile(budgetFile, 'utf8'), error => error.code === 'ENOENT')
+})
+
+test('survives an aborted request body without a provider call or budget spend', async () => {
+  const budgetFile = await temporaryBudget()
+  let providerCalls = 0
+  let unhandledRejection
+  const captureUnhandled = error => { unhandledRejection = error }
+  process.on('unhandledRejection', captureUnhandled)
+  try {
+    const origin = await startServer({
+      env: {
+        ANTHROPIC_API_KEY: 'server-only-key',
+        ANTHROPIC_MODEL: 'claude-sonnet-5-5',
+        MODEL_BUDGET_FILE: budgetFile
+      },
+      fetchImpl: async () => {
+        providerCalls += 1
+        return successResponse()
+      }
+    })
+
+    const aborted = await abortPostBody(origin)
+    assert.equal(aborted.error?.message, 'intentional test abort')
+    await new Promise(resolve => setImmediate(resolve))
+    await new Promise(resolve => setImmediate(resolve))
+
+    const healthResponse = await fetch(`${origin}/api/health`)
+    const health = await healthResponse.json()
+    assert.equal(healthResponse.status, 200)
+    assert.equal(health.status, 'ok')
+    assert.equal(providerCalls, 0)
+    assert.equal(unhandledRejection, undefined)
+    await assert.rejects(readFile(budgetFile, 'utf8'), error => error.code === 'ENOENT')
+  } finally {
+    process.removeListener('unhandledRejection', captureUnhandled)
+  }
 })
 
 test('persists the daily allowance across server restart', async () => {

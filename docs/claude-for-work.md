@@ -80,6 +80,7 @@ End with a source check and the condition for the next business decision.
 ## Choose one role task
 
 - **Account Executive:** Produce a renewal brief for call preparation. Include supported facts, open questions, a safe next step, and the evidence required before making a customer commitment.
+- **Sales manager:** Inspect the unfinished brief in the paired failure lesson. Mark missing actions and source checks, route the request change to the technical owner, and require a fresh `end_turn` response plus account-owner review before use.
 - **Revenue Operations:** Produce a proposed CRM field map. Leave unsupported fields blank, name each exception route, and do not perform a CRM write.
 - **Marketing:** Produce an internal claim worksheet. Mark each claim accept, revise, or reject, and state what approval would be needed before public use.
 - **Product manager:** Produce a pilot requirement. Define missing-source behavior, human review, failure behavior, acceptance checks, and a proceed, revise, or stop recommendation.

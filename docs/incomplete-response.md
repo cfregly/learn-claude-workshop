@@ -139,7 +139,7 @@ output budget. Run a fresh synthetic case and record its terminal state.
 ACCOUNT NEXT STEP: Maya checks the fresh brief against CRM, CALL, SUPPORT, and
 USAGE before anyone uses it for account planning.
 
-USE CONDITION: Generation reaches a terminal state, all required sections are
+USE CONDITION: Generation finishes with stop_reason end_turn, all required sections are
 present, and every customer claim passes the source check.
 ```
 
