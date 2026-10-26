@@ -440,3 +440,44 @@ test('non-JSON highlighting keeps unsafe HTML literal and exact clipboard text',
   }
   assert.deepEqual(copied, [source])
 })
+
+test('unlabeled valid JSON wins over Python-looking string values', () => {
+  const documentRef = new TestDocument()
+  const root = documentRef.createElement('main')
+  const pre = documentRef.createElement('pre')
+  pre.textContent = '{"state":"None","ready":true}'
+  root.append(pre)
+
+  enhanceCodeBlocks(root)
+  const code = pre.firstElementChild
+  assert.equal(code.classList.contains('language-json'), true)
+  assert.ok(code.querySelectorAll('.code-token-key').some(node => node.textContent === '"state"'))
+  assert.ok(code.querySelectorAll('.code-token-string').some(node => node.textContent === '"None"'))
+  assert.equal(code.querySelectorAll('.code-token-keyword').length, 0)
+  assert.equal(pre.textContent, '{\n  "state": "None",\n  "ready": true\n}')
+})
+
+test('unlabeled source and reference prose skip language heuristics', () => {
+  const documentRef = new TestDocument()
+  const root = documentRef.createElement('main')
+  const source = documentRef.createElement('pre')
+  source.className = 'source-record'
+  const sourceCode = documentRef.createElement('code')
+  sourceCode.textContent = 'Let the owner import the record and export only facts marked True.'
+  source.append(sourceCode)
+  const reference = documentRef.createElement('pre')
+  reference.className = 'answer-text'
+  const referenceCode = documentRef.createElement('code')
+  referenceCode.textContent = 'const and let are words here. import and export are not instructions.'
+  reference.append(referenceCode)
+  root.append(source, reference)
+
+  enhanceCodeBlocks(root)
+  for (const [pre, code] of [[source, sourceCode], [reference, referenceCode]]) {
+    assert.equal(pre.firstElementChild, code)
+    assert.equal(pre.firstElementChild.classList.contains('code-highlight'), false)
+    assert.equal(pre.querySelectorAll('.code-token').length, 0)
+  }
+  assert.equal(source.textContent, 'Let the owner import the record and export only facts marked True.')
+  assert.equal(reference.textContent, 'const and let are words here. import and export are not instructions.')
+})

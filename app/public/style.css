@@ -214,3 +214,5 @@ footer { padding-bottom: 84px; }
 .ask-form .ask-status{margin:4px 0 8px;font-size:.75rem}
 .ask-privacy{margin-bottom:0;padding-top:8px}
 @media(max-width:760px){.ask-body .ask-excerpt-text{max-height:90px}.ask-form textarea{min-height:72px;max-height:140px}}
+
+@media print{.ask-launcher,.ask-selection,.ask-widget-button,.ask-panel,.material-reader-bar,.code-toolbar button,.code-copy-status{display:none!important}.code-block-wrap pre,.code-block-wrap pre code{background:#fff!important;color:#111!important}.code-toolbar{background:#fff;color:#111}}

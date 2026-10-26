@@ -1,4 +1,4 @@
-import { renderMarkdown } from './materials-viewer.js?v=learning-context-2'
+import { renderMarkdown, readableText } from './materials-viewer.js?v=learning-context-3'
 
 function node(tag, text = '', className = '') {
   const element = document.createElement(tag)
@@ -34,10 +34,14 @@ export function initAskClaude({ getContext }) {
   excerptPanel.hidden = true
   const excerptHeader = node('div', '', 'ask-excerpt-header')
   const excerptLabel = node('strong', '', 'small')
+  excerptLabel.id = 'ask-excerpt-label'
   const removeExcerpt = node('button', 'Remove', 'button quiet small')
   removeExcerpt.type = 'button'
   removeExcerpt.setAttribute('aria-label', 'Remove selected context')
   const excerptText = node('div', '', 'ask-excerpt-text small')
+  excerptText.tabIndex = 0
+  excerptText.setAttribute('role', 'region')
+  excerptText.setAttribute('aria-labelledby', 'ask-excerpt-label')
   const excerptNote = node('p', '', 'small muted')
   excerptHeader.append(excerptLabel, removeExcerpt)
   excerptPanel.append(excerptHeader, excerptText, excerptNote)
@@ -121,7 +125,7 @@ export function initAskClaude({ getContext }) {
     excerpt = prepareSelectedContent(options.text, options.label)
     setThread()
     contextLabel.textContent = current.label
-    status.textContent = busy ? 'Claude is finishing the previous question. You can continue the lesson while it runs.' : ''
+    status.textContent = busy ? 'Claude is finishing the previous question. You can continue the lesson while it runs.' : excerpt ? 'Passage attached. Edit your question, then press Ask Claude.' : ''
     syncExcerpt()
     render()
     if (!panel.open) panel.showModal()
@@ -139,6 +143,7 @@ export function initAskClaude({ getContext }) {
     setThread()
     syncExcerpt()
     render()
+    status.textContent = 'Selected context removed. Earlier questions about it are set aside.'
     input.focus()
   })
   close.addEventListener('click', () => panel.close())
@@ -147,7 +152,7 @@ export function initAskClaude({ getContext }) {
     const bounds = panel.getBoundingClientRect()
     if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) panel.close()
   })
-  panel.addEventListener('close', () => { (returnFocus?.isConnected ? returnFocus : launcher).focus({ preventScroll: true }) })
+  panel.addEventListener('close', () => { (returnFocus?.isConnected && !returnFocus.hidden ? returnFocus : launcher).focus({ preventScroll: true }) })
   clear.addEventListener('click', () => {
     if (busy) return
     threads.delete(activeKey)
@@ -248,8 +253,8 @@ export function suggestedFollowUps(answer,context={}) {
 
 
 export function prepareSelectedContent(text, label = 'Selected passage') {
-  const value = String(text || '').trim()
-  if (!value) return null
+  const value = String(text || '')
+  if (!value.trim()) return null
   return {
     label: String(label || 'Selected passage').trim().slice(0, 160),
     text: value.slice(0, 6000).replace(/[\uD800-\uDBFF]$/, ''),
@@ -268,19 +273,17 @@ function readLearnerSelection(panel) {
   const selection = window.getSelection()
   if (!selection || selection.isCollapsed || !selection.toString().trim()) return null
   const anchor = selection.anchorNode?.parentElement
-  if (anchor?.closest('#ask-claude,header,footer,nav')) return null
+  if (anchor?.closest('#ask-claude,.material-reader,header,footer,nav')) return null
   return {text: selection.toString(), label: 'Selected passage'}
 }
 
-function widgetContent(widget) {
-  if (widget.classList.contains('code-block-wrap')) return widget.querySelector('pre')?.textContent || ''
-  const clone = widget.cloneNode(true)
-  for (const element of clone.querySelectorAll('button,input,textarea,select,[hidden],[role="status"],.code-toolbar,script,style')) element.remove()
-  return clone.innerText || clone.textContent || ''
+export function widgetContent(widget) {
+  if (widget.matches('.source-fact')) return Array.from(widget.children).map(readableText).filter(Boolean).join('\n')
+  return readableText(widget).trim()
 }
 
 function widgetLabel(widget) {
-  const heading = widget.querySelector('h2,h3,h4,summary,.code-label,.source-tag')
+  const heading = widget.querySelector('h2,h3,h4,summary,.code-label,.source-tag,.code-language')
   return (heading?.textContent || (widget.classList.contains('code-block-wrap') ? 'Code example' : 'This activity')).trim().slice(0, 160)
 }
 
@@ -309,14 +312,14 @@ function installContextActions({open, panel}) {
     for (const widget of widgets) {
       if (widget.closest('#ask-claude') || widget.dataset.askReady) continue
       // A code block owns its action even when it sits inside a reference.
-      if (widget.matches('details.reference') && widget.querySelector('.code-block-wrap')) continue
+      if (widget.matches('details.reference') && widget.querySelector('.code-block-wrap,pre')) continue
       widget.dataset.askReady = 'true'
       const action = node('button', 'Ask', 'ask-widget-button button quiet small')
       action.type = 'button'
       const label = widgetLabel(widget)
       action.setAttribute('aria-label', `Ask about ${label}`)
       action.addEventListener('click', () => open({text:widgetContent(widget),label,trigger:action}))
-      const toolbar = widget.querySelector('.code-toolbar')
+      const toolbar = widget.matches('.code-block-wrap') ? widget.querySelector('.code-toolbar') : null
       if (toolbar) toolbar.append(action)
       else if (widget.matches('details')) widget.querySelector('summary')?.after(action)
       else widget.prepend(action)

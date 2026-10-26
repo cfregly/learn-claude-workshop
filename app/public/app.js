@@ -1,13 +1,13 @@
 import { mountIntegrationMap } from './integration-map.js?v=review-1'
 import { mountSharedIntegration } from './shared-integration.js?v=20261026-final-review'
 import { paths } from './content.js?v=20261025-rename'
-import { renderMaterial, installMaterialReaderLinks } from './materials-viewer.js?v=learning-context-2'
+import { renderMaterial, closeMaterialReader, installMaterialReaderLinks } from './materials-viewer.js?v=learning-context-3'
 import { mountLiveDemo } from './live-demo.js?v=20261025-rename'
-import { initAskClaude } from './ask-claude.js?v=learning-context-2'
-import { observeCodeBlocks } from './code-blocks.js?v=learning-context-2'
+import { initAskClaude } from './ask-claude.js?v=learning-context-3'
+import { observeCodeBlocks } from './code-blocks.js?v=learning-context-3'
 import { mountStreamingLab } from './streaming-lab.js?v=20261025-rename'
-import { mountLiveWorkflow } from './live-workflow.js?v=20261026-review-fixes'
-import { mountNativeIntegration } from './native-integration.js?v=20261026-resource'
+import { mountLiveWorkflow } from './live-workflow.js?v=learning-context-3'
+import { mountNativeIntegration } from './native-integration.js?v=learning-context-3'
 const githubRef = '75ba253996e7da32a9a7bdbfd3096d575b0bc3fe'
 const nativeIntegrationRef = 'c74acd400dbb05243116993ada98f23349616549'
 const githubRoot = 'https://github.com/cfregly/learn-claude-workshop'
@@ -380,7 +380,7 @@ function nativeIntegrationPage() {
   const goal = path
     ? learningGoal(path)
     : '<p class="lesson-outcome"><strong>Your goal</strong> Choose a supported learning path before running this optional integration.</p>'
-  const unavailable = !supported ? `<section class="notice"><strong>No native run is available for this selected view.</strong> ${path?`Your ${esc(roleName(path))} goal remains selected. `:''}The optional native panel supports only the Software engineer and Account Executive paths, so no capability or provider request starts here.</section><div class="actions"><a class="button secondary" href="#path/software-engineer-api/0">Select the Software engineer path</a><a class="button secondary" href="#path/account-executive/0">Select the Account Executive path</a></div><div class="actions live-workflow-resources"><a class="button quiet" href="#material/native-integration" rel="noopener noreferrer">Read the pinned guide &#8599;</a><a class="button quiet" href="#material/native-integration-code" rel="noopener noreferrer">Inspect the full Skill bundle &#8599;</a></div>` : '<div id="native-integration"></div>'
+  const unavailable = !supported ? `<section class="notice"><strong>No native run is available for this selected view.</strong> ${path?`Your ${esc(roleName(path))} goal remains selected. `:''}The optional native panel supports only the Software engineer and Account Executive paths, so no capability or provider request starts here.</section><div class="actions"><a class="button secondary" href="#path/software-engineer-api/0">Select the Software engineer path</a><a class="button secondary" href="#path/account-executive/0">Select the Account Executive path</a></div><div class="actions live-workflow-resources"><a class="button quiet" href="#material/native-integration" rel="noopener noreferrer">Read the pinned guide</a><a class="button quiet" href="#material/native-integration-code" rel="noopener noreferrer">Inspect the full Skill bundle</a></div>` : '<div id="native-integration"></div>'
   main.innerHTML = `<div class="page"><a class="back-link" href="#resources">&#8592; Back to Materials</a><h1>Native MCP and Skill integration</h1>${goal}<p class="lead">The application reads fixed Northstar context through its local, read-only MCP server. Claude then runs the exact pinned Skill in native code execution. The prepared guide explains the design. This page shows a receipt only after this runtime observes the evidence.</p>${unavailable}</div>`
   if (!supported) return
   nativeIntegrationHandle = mountNativeIntegration(document.querySelector('#native-integration'), {
@@ -473,7 +473,7 @@ function render() {
   document.querySelector('#facilitator-mode').checked=Boolean(state.facilitator)
   updateTimer()
 }
-window.addEventListener('hashchange',()=>{window.scrollTo(0,0);render();questionGuide.refreshContext();if(!document.querySelector('#ask-claude')?.open)main.focus({preventScroll:true})})
+window.addEventListener('hashchange',()=>{closeMaterialReader();window.scrollTo(0,0);render();questionGuide.refreshContext();if(!document.querySelector('#ask-claude')?.open)main.focus({preventScroll:true})})
 document.querySelector('#facilitator-mode').addEventListener('change',e=>{state.facilitator=e.target.checked;save();render()})
 main.addEventListener('input',e=>{
   if(e.target.dataset.groupTrace){state.groupTrace ||= {};state.groupTrace[e.target.dataset.groupTrace]=e.target.value;save()}
@@ -587,6 +587,6 @@ const questionGuide = initAskClaude({getContext() {
   if(kind==='resources')return {context:{route:'resources',...(path?{role_id:path.id}:{})},label:'Materials and learning record',suggestions:['Which reference helps me continue my activity?','How do I export my saved work?','Which examples run without an API key?']}
   return {context:{route:'home'},label:'Choose your learning path',suggestions:['Which path fits my learning need?','Explain the shared workflow','How would this work in my organization?']}
 }})
-installMaterialReaderLinks(document, () => ({githubRef, contextLabel: document.querySelector('.lesson-outcome')?.textContent || 'Workshop reference', onAsk: request => questionGuide.open(request)}))
+installMaterialReaderLinks(document, () => {const path=paths.find(item=>item.id===state.lastPath);return {githubRef,contextLabel:path?roleName(path):undefined,onAsk:request=>questionGuide.open(request)}})
 observeCodeBlocks(document.body)
 render()

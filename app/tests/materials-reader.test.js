@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import {
-  closeMaterialReader, installMaterialReaderLinks, materialIdForHref, openMaterialReader, renderMarkdown, renderMaterial
+  closeMaterialReader, installMaterialReaderLinks, materialIdForHref, openMaterialReader, readableText, renderMarkdown, renderMaterial
 } from '../public/materials-viewer.js'
 
 class TestNode {
@@ -317,6 +317,59 @@ test('Ask preserves highlighted code text without inserting newlines between tok
   dialog.querySelector('[data-material-body]').replaceChildren(pre)
   find(dialog, node => node.tagName === 'BUTTON' && node.textContent === 'Ask about this reference').click()
   assert.equal(request.text, expected)
+})
+
+test('readableText keeps inline code, strong text, and links in the paragraph text run', t => {
+  const { document } = setup(t)
+  const content = document.createElement('section')
+  renderMarkdown(content, [
+    '# Request fields', '',
+    'Set `max_tokens` to **100** and read [the guide](https://example.com/guide) before sending.', '',
+    'Keep the source record nearby.'
+  ].join('\n'))
+  assert.equal(readableText(content.querySelector('p')), 'Set max_tokens to 100 and read the guide before sending.')
+  assert.equal(readableText(content), 'Request fields\nSet max_tokens to 100 and read the guide before sending.\nKeep the source record nearby.')
+})
+
+test('readableText separates table cells with pipes and keeps each row on its own line', t => {
+  const { document } = setup(t)
+  const content = document.createElement('section')
+  renderMarkdown(content, [
+    'Read the request contract.', '',
+    '| Field | Meaning |',
+    '| --- | --- |',
+    '| `model` | **Model** identifier |',
+    '| `max_tokens` | [Response limit](https://example.com/limit) |', '',
+    'Then run the example.'
+  ].join('\n'))
+  assert.equal(readableText(content.querySelector('table')), 'Field | Meaning\nmodel | Model identifier\nmax_tokens | Response limit')
+  assert.equal(readableText(content), 'Read the request contract.\nField | Meaning\nmodel | Model identifier\nmax_tokens | Response limit\nThen run the example.')
+})
+
+test('readableText excludes controls, hidden content, actions, toolbars, and status UI', t => {
+  const { document } = setup(t)
+  const content = document.createElement('section')
+  const paragraph = document.createElement('p')
+  paragraph.textContent = 'The visible source fact.'
+  content.append(paragraph)
+  for (const tag of ['button', 'input', 'textarea', 'select']) {
+    const control = document.createElement(tag)
+    control.textContent = 'Private input or control text'
+    content.append(control)
+  }
+  for (const [attribute, value] of [['hidden', ''], ['aria-hidden', 'true'], ['role', 'status']]) {
+    const hidden = document.createElement('div')
+    hidden.textContent = 'Unrelated hidden or status text'
+    hidden.setAttribute(attribute, value)
+    content.append(hidden)
+  }
+  for (const className of ['actions', 'code-toolbar', 'status']) {
+    const toolbar = document.createElement('div')
+    toolbar.className = className
+    toolbar.textContent = 'Toolbar or status text'
+    content.append(toolbar)
+  }
+  assert.equal(readableText(content), 'The visible source fact.')
 })
 
 test('prepared native bundle reads local files and GitHub originals use normal navigation', async t => {

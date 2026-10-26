@@ -61,6 +61,17 @@ function detectLanguage(source) {
   return ''
 }
 
+function detectJson(source) {
+  const text = String(source || '').trim()
+  if (!/^[\[{]/.test(text)) return ''
+  try {
+    JSON.parse(text)
+    return 'json'
+  } catch {
+    return ''
+  }
+}
+
 function labelText(pre) {
   const previous = pre.previousElementSibling
   if (previous?.classList.contains('code-label')) return previous.textContent.trim()
@@ -83,6 +94,9 @@ function languageHint(pre, label, source = '') {
   if (/\bsql\b/.test(value)) return 'sql'
   if (/\b(?:sse|stream|events?)\b/.test(value)) return 'sse'
   if (/\bjson\b/.test(value)) return 'json'
+  const json = detectJson(source)
+  if (json) return json
+  if (pre.classList.contains('source-record') || pre.classList.contains('answer-text')) return ''
   return detectLanguage(source)
 }
 

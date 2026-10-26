@@ -478,15 +478,40 @@ function selectedReaderText(session) {
   return selection.toString().trim()
 }
 
-function readableText(element) {
+const textBlocks = new Set([
+  'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'CAPTION', 'DD', 'DETAILS', 'DIV', 'DL', 'DT',
+  'FIELDSET', 'FIGCAPTION', 'FIGURE', 'FOOTER', 'FORM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+  'HEADER', 'HR', 'LI', 'MAIN', 'NAV', 'OL', 'P', 'PRE', 'SECTION', 'SUMMARY', 'TABLE',
+  'TBODY', 'TFOOT', 'THEAD', 'TR', 'UL'
+])
+
+export function readableText(element) {
   if (!element) return ''
   if (element.nodeType === 3) return element.textContent
-  if (/^(BUTTON|INPUT|TEXTAREA|SELECT|OPTION)$/.test(element.tagName)
-    || element.hidden || element.getAttribute?.('aria-hidden') === 'true'
-    || /(?:^|\s)(?:actions|code-toolbar)(?:\s|$)/.test(element.className || '')) return ''
+  if (/^(BUTTON|INPUT|TEXTAREA|SELECT|OPTION|OPTGROUP|SCRIPT|STYLE|TEMPLATE|NOSCRIPT)$/.test(element.tagName)
+    || element.hidden || element.hasAttribute?.('hidden') || element.getAttribute?.('aria-hidden') === 'true'
+    || element.getAttribute?.('role') === 'status'
+    || /(?:^|\s)(?:actions|code-toolbar|status)(?:\s|$)/.test(element.className || '')) return ''
   if (element.tagName === 'PRE') return element.textContent
+  if (element.tagName === 'BR') return '\n'
   if (element.tagName === 'DETAILS' && !element.open) return readableText(element.querySelector('summary'))
-  return Array.from(element.childNodes || []).map(child => readableText(child)).join('\n')
+  if (element.tagName === 'TR') {
+    return Array.from(element.children || []).filter(child => /^(TH|TD)$/.test(child.tagName)).map(readableText).join(' | ')
+  }
+  const children = Array.from(element.childNodes || [])
+  const hasBlocks = children.some(child => textBlocks.has(child.tagName))
+  let result = ''
+  let previousBlock = false
+  for (const child of children) {
+    if (hasBlocks && child.nodeType === 3 && !child.textContent.trim()) continue
+    const text = readableText(child)
+    if (!text) continue
+    const block = textBlocks.has(child.tagName)
+    if (result && (block || previousBlock) && !result.endsWith('\n') && !text.startsWith('\n')) result += '\n'
+    result += text
+    previousBlock = block
+  }
+  return result
 }
 
 function finishReader(session) {
