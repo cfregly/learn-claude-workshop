@@ -248,6 +248,7 @@ function selectForManualCopy(pre) {
 
 function copyHandler(pre, status) {
   return async () => {
+    status.textContent = ''
     const source = pre.textContent || ''
     try {
       const clipboard = globalThis.navigator?.clipboard

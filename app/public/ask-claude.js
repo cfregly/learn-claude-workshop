@@ -120,6 +120,12 @@ export function initAskClaude({ getContext }) {
     activeKey = JSON.stringify([current.context, current.threadKey || null, excerpt ? [excerpt.label, excerpt.text] : null])
   }
   function open(options = {}) {
+    if (busy) {
+      returnFocus = options.trigger || document.activeElement
+      status.textContent = 'Claude is finishing your original question. Its passage stays attached.'
+      if (!panel.open) panel.showModal()
+      return
+    }
     current = getContext()
     returnFocus = options.trigger || document.activeElement
     excerpt = prepareSelectedContent(options.text, options.label)
@@ -147,10 +153,17 @@ export function initAskClaude({ getContext }) {
     input.focus()
   })
   close.addEventListener('click', () => panel.close())
-  panel.addEventListener('click', event => {
-    if (event.target !== panel) return
+  let backdropPress = false
+  function onBackdrop(event) {
+    if (event.target !== panel) return false
     const bounds = panel.getBoundingClientRect()
-    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) panel.close()
+    return event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom
+  }
+  panel.addEventListener('pointerdown', event => { backdropPress = onBackdrop(event) })
+  panel.addEventListener('click', event => {
+    const closeFromBackdrop = backdropPress && onBackdrop(event)
+    backdropPress = false
+    if (closeFromBackdrop) panel.close()
   })
   panel.addEventListener('close', () => { (returnFocus?.isConnected && !returnFocus.hidden ? returnFocus : launcher).focus({ preventScroll: true }) })
   clear.addEventListener('click', () => {
@@ -182,7 +195,7 @@ export function initAskClaude({ getContext }) {
     try {
       const response = await fetch('/api/ask', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({question, context, ...(selectedContent ? {selected_content: selectedContent} : {}), history: previous.slice(-4).map(({role, content}) => ({role, content: content.slice(0,2000)}))}),
+        body: JSON.stringify({question, context, ...(selectedContent ? {selected_content: selectedContent} : {}), history: previous.slice(-4).map(({role, content}) => ({role, content: content.slice(0,2000).replace(/[\uD800-\uDBFF]$/, '')}))}),
         signal: AbortSignal.timeout(30000)
       })
       const data = await response.json()
@@ -268,7 +281,7 @@ function readLearnerSelection(panel) {
   if (panel.contains(active)) return null
   if (active?.matches('textarea,input[type="text"],input:not([type])')) {
     const text = active.value.slice(active.selectionStart || 0, active.selectionEnd || 0)
-    return text.trim() ? {text, label: 'Selected text from your work'} : null
+    return text.trim() ? {text, label: 'Selected text from your work', trigger: active} : null
   }
   const selection = window.getSelection()
   if (!selection || selection.isCollapsed || !selection.toString().trim()) return null
@@ -302,24 +315,28 @@ function installContextActions({open, panel}) {
   selectionAction.addEventListener('pointerdown', event => event.preventDefault())
   selectionAction.addEventListener('click', () => {
     if (!selection) return
-    open({...selection,trigger:selectionAction})
+    open({...selection,trigger:selection.trigger || selectionAction})
     selectionAction.hidden = true
   })
   panel.addEventListener('close', updateSelection)
-  const selector = '.code-block-wrap,.source-fact,.workflow,.draft,.integration-map-host,.route-content,.quiz,.live-workflow-output,.diagnostic-case,.streaming-lab-trace > section,details.reference'
+  const selector = '.code-block-wrap,.source-fact,.workflow,.integration-map-host,.route-content,.live-workflow-output,.diagnostic-case,.streaming-lab-trace > section,details.reference'
   function enhance(root) {
     const widgets = [...(root.matches?.(selector) ? [root] : []), ...(root.querySelectorAll?.(selector) || [])]
     for (const widget of widgets) {
-      if (widget.closest('#ask-claude') || widget.dataset.askReady) continue
+      if (widget.matches('input,textarea,select') || widget.closest('#ask-claude')) continue
+      const toolbar = widget.matches('.code-block-wrap') ? widget.querySelector('.code-toolbar') : null
+      const ownAction = toolbar?.querySelector('.ask-widget-button') || Array.from(widget.children).find(child => child.classList.contains('ask-widget-button'))
       // A code block owns its action even when it sits inside a reference.
-      if (widget.matches('details.reference') && widget.querySelector('.code-block-wrap,pre')) continue
-      widget.dataset.askReady = 'true'
+      if (widget.matches('details.reference') && widget.querySelector('.code-block-wrap,pre')) {
+        ownAction?.remove()
+        continue
+      }
+      if (ownAction) continue
       const action = node('button', 'Ask', 'ask-widget-button button quiet small')
       action.type = 'button'
       const label = widgetLabel(widget)
       action.setAttribute('aria-label', `Ask about ${label}`)
       action.addEventListener('click', () => open({text:widgetContent(widget),label,trigger:action}))
-      const toolbar = widget.matches('.code-block-wrap') ? widget.querySelector('.code-toolbar') : null
       if (toolbar) toolbar.append(action)
       else if (widget.matches('details')) widget.querySelector('summary')?.after(action)
       else widget.prepend(action)
@@ -327,6 +344,11 @@ function installContextActions({open, panel}) {
   }
   enhance(document.body)
   new MutationObserver(records => {
-    for (const record of records) for (const added of record.addedNodes) if (added.nodeType === 1) enhance(added)
+    for (const record of records) {
+      const target = record.target?.nodeType === 1 ? record.target : record.target?.parentElement
+      const widget = target?.closest(selector)
+      if (widget) enhance(widget)
+      for (const added of record.addedNodes) if (added.nodeType === 1) enhance(added)
+    }
   }).observe(document.body,{childList:true,subtree:true})
 }
