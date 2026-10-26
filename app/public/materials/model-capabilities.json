@@ -1,0 +1,89 @@
+{
+  "observed_at": "2026-10-25",
+  "source": "GET /v1/models/{model_id}",
+  "note": "Observed capability excerpt. Recheck the selected model before using it. This is configuration evidence, not an inference result.",
+  "models": [
+    {
+      "id": "claude-sonnet-5-5",
+      "capabilities": {
+        "thinking": {
+          "supported": true,
+          "types": {
+            "enabled": {
+              "supported": false
+            },
+            "adaptive": {
+              "supported": true
+            },
+            "disabled": {
+              "supported": false
+            },
+            "between_tools": {
+              "supported": true
+            }
+          }
+        },
+        "effort": {
+          "supported": true,
+          "low": {
+            "supported": true
+          },
+          "medium": {
+            "supported": true
+          },
+          "high": {
+            "supported": true
+          },
+          "xhigh": {
+            "supported": true
+          },
+          "max": {
+            "supported": true
+          }
+        }
+      },
+      "model_output_ceiling": 128000
+    },
+    {
+      "id": "claude-opus-5-5",
+      "capabilities": {
+        "thinking": {
+          "supported": true,
+          "types": {
+            "enabled": {
+              "supported": false
+            },
+            "adaptive": {
+              "supported": true
+            },
+            "disabled": {
+              "supported": false
+            },
+            "between_tools": {
+              "supported": false
+            }
+          }
+        },
+        "effort": {
+          "supported": true,
+          "low": {
+            "supported": true
+          },
+          "medium": {
+            "supported": true
+          },
+          "high": {
+            "supported": true
+          },
+          "xhigh": {
+            "supported": true
+          },
+          "max": {
+            "supported": true
+          }
+        }
+      },
+      "model_output_ceiling": 128000
+    }
+  ]
+}

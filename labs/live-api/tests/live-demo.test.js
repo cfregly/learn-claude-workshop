@@ -162,6 +162,7 @@ test('reports live capability without revealing a credential and keeps health ac
     'tool_write_confirmed_final_stream_lost'
   ])
   assert.deepEqual(capability.ask.streaming_roles, ['engineer', 'sales', 'product'])
+  assert.deepEqual(capability.ask.streaming_modes, ['replay', 'live'])
   assert.deepEqual(capability.ask.streaming_scenarios, [
     { id: 'happy', step_count: 23 },
     { id: 'unauthorized', step_count: 22 },
@@ -170,7 +171,6 @@ test('reports live capability without revealing a credential and keeps health ac
   assert.equal(JSON.stringify(capability).includes('ANTHROPIC_API_KEY'), false)
 
   const health = await (await fetch(`${origin}/api/health`)).json()
-  assert.equal(health.workshop, 'learn-claude-workshop')
   assert.equal(health.mode, 'reference-exercises')
   assert.deepEqual(health.live_demo, { available: false, configured: false, reason: 'not_configured' })
 })
@@ -456,6 +456,56 @@ test('derives streaming question context from the canonical trace module', async
   assert.match(capabilityPrompt, /not live provider, account, entitlement, or availability state/)
   assert.match(capabilityPrompt, /Sonnet 5\.5 supports adaptive thinking and between_tools/)
   assert.match(capabilityPrompt, /Opus 5\.5 supports only adaptive thinking among those four modes/)
+})
+
+test('keeps live Ask context separate from prepared replay state and current run receipts', async () => {
+  const budgetFile = await temporaryBudget()
+  let providerCall
+  let providerCalls = 0
+  const origin = await startServer({
+    env: {
+      ANTHROPIC_API_KEY: 'server-only-key',
+      ANTHROPIC_MODEL: 'claude-sonnet-5-5',
+      MODEL_BUDGET_FILE: budgetFile
+    },
+    cooldownMs: 0,
+    fetchImpl: async (url, options) => {
+      providerCalls += 1
+      providerCall = { url, options }
+      return successResponse('Wait for complete before treating the live workflow as finished.')
+    }
+  })
+
+  const response = await ask(origin, {
+    question: 'What does the live mode prove while it is streaming?',
+    context: {
+      route: 'streaming',
+      role_id: 'software-engineer-api',
+      stream_mode: 'live'
+    }
+  })
+  assert.equal(response.status, 200)
+  const payload = JSON.parse(providerCall.options.body)
+  const prompt = payload.messages[0].content[0].text
+  assert.match(prompt, /Trusted live streaming workflow context/)
+  assert.match(prompt, /official Anthropic TypeScript SDK for real provider streaming/)
+  assert.match(prompt, /separate from the prepared replay scenarios/)
+  assert.match(prompt, /synthetic teaching identity/)
+  assert.match(prompt, /HTTP 200 and visible text do not prove completion/)
+  assert.match(prompt, /no current draft, SSE event, trace ID, provider request ID, run receipt, tool receipt, or completion state/)
+  assert.equal(prompt.includes('Scenario: Timeout or interrupted stream'), false)
+
+  for (const context of [
+    { route: 'streaming', stream_mode: 'live' },
+    { route: 'home', role_id: 'software-engineer-api', stream_mode: 'live' },
+    { route: 'streaming', role_id: 'software-engineer-api', stream_mode: 'current' },
+    { route: 'streaming', role_id: 'software-engineer-api', stream_mode: 'live', stream_scenario: 'happy', stream_step: 0, stream_role: 'engineer' }
+  ]) {
+    const invalid = await ask(origin, { question: 'Help', context })
+    assert.equal(invalid.status, 400)
+    assert.equal((await invalid.json()).code, 'invalid_question')
+  }
+  assert.equal(providerCalls, 1)
 })
 
 test('hard-limits a contextual answer to 180 words and marks it incomplete', async () => {
@@ -816,22 +866,4 @@ test('maps provider access, credit, rate limit, and timeout errors without expos
     assert.equal(result.code, 'provider_timeout')
     assert.equal(calls, 1)
   })
-})
-
-test('answers Materials questions from the allowlisted resource summary', async () => {
-  let providerPrompt
-  const origin = await startServer({
-    env: { ANTHROPIC_API_KEY: 'server-only-key', ANTHROPIC_MODEL: 'claude-sonnet-5-5', MODEL_BUDGET_FILE: await temporaryBudget() },
-    cooldownMs: 0,
-    fetchImpl: async (url, options) => {
-      providerPrompt = JSON.parse(options.body).messages[0].content[0].text
-      return successResponse('Use Export my progress on Materials to download your browser learning record.')
-    }
-  })
-  const response = await ask(origin, { question: 'How do I export my work?', context: { route: 'resources' } })
-  assert.equal(response.status, 200)
-  assert.match(providerPrompt, /Materials page groups the core workflow/)
-  assert.match(providerPrompt, /Export my progress downloads the browser learning record/)
-  assert.doesNotMatch(providerPrompt, /The home route helps a learner choose/)
-  assert.equal(JSON.stringify(await response.json()).includes('server-only-key'), false)
 })

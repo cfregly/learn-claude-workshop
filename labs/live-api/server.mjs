@@ -35,6 +35,20 @@ export function createServer(options = {}) {
         const result = await liveDemo.handleAsk(request)
         return send(result.statusCode,JSON.stringify(result.body),{'Content-Type':'application/json','Cache-Control':'no-store',...(result.headers||{})})
       }
+      if(pathname==='/api/workflow') {
+        const result = await liveDemo.handleWorkflow(request)
+        if(!result.stream) return send(result.statusCode,JSON.stringify(result.body),{'Content-Type':'application/json','Cache-Control':'no-store',...(result.headers||{})})
+        response.writeHead(200,{
+          ...headers,
+          'Content-Type':'text/event-stream; charset=utf-8',
+          'Cache-Control':'no-store, no-cache, must-revalidate',
+          'Connection':'keep-alive',
+          'X-Accel-Buffering':'no'
+        })
+        response.flushHeaders()
+        await result.start(response)
+        return
+      }
       if(pathname==='/api/health') {
         if(!['GET','HEAD'].includes(request.method)) return send(405,'Method not allowed',{'Allow':'GET, HEAD'})
         const demo = await liveDemo.capabilities()

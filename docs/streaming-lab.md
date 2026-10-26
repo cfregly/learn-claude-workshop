@@ -1,6 +1,13 @@
 # Direct Claude API streaming lab
 
-This ten minute Northstar exercise uses prepared synthetic events. It makes no network request, calls no model, and performs no account action. The live Claude API example elsewhere on the site is separate.
+This ten minute Northstar replay uses prepared synthetic events. It makes no network request, calls no model, and performs no account action.
+
+## Choose the replay or live route
+
+- **Replay for repeatable teaching and failures.** Stay in this lab at [Streaming events](https://learn.fluxcapacitor.dev/#streaming). Run the same happy, unauthorized, and interrupted traces without a credential or provider call.
+- **Live for provider streaming and one executed local lookup.** Open the [live streaming guide](https://learn.fluxcapacitor.dev/#material/live-stream-tool), then run the [Python starter](https://learn.fluxcapacitor.dev/#material/live-stream-tool-code). Live mode makes at most two Messages API calls and executes one read-only lookup against the bundled synthetic Northstar fixture. It does not connect to a CRM or change a customer record.
+
+Both routes teach the same event, tool ID, authorization, and terminal-state boundaries. The replay is the stable baseline. The live route adds provider behavior, latency, usage, and possible API errors.
 
 ## Learning goal
 

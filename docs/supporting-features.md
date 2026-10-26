@@ -81,7 +81,7 @@ Citations cannot be combined with `output_config.format`. First review cited tex
 
 **Familiar task.** The same source pack and instructions appear in many renewal questions.
 
-**Plain explanation.** Prompt caching can reuse an eligible, identical prefix. Put stable tools, instructions, and source context first. A change before the breakpoint can miss. Minimum length depends on the model. On October 25, 2026, Sonnet 5.5 and Opus 5.5 require 512 tokens.
+**Plain explanation.** Prompt caching can reuse an eligible, identical prefix. Put stable tools, instructions, and source context first. A change before the breakpoint can miss. Minimum length depends on the model. Check the current model-specific minimum before use.
 
 **Prepared demo.** These are synthetic usage objects, not observed billing records.
 
@@ -222,7 +222,7 @@ Business learners see candidates with supported reasons and no customer action. 
 
 **Plain explanation.** The beta advisor tool lets an executor model consult a compatible advisor inside one Messages request. It can improve a plan. It cannot provide human approval, customer consent, or source evidence.
 
-**Prepared demo.** As documented on October 25, 2026, Claude Sonnet 5 with Claude Opus 5.5 is an allowed pair. Verify the compatibility table again before use.
+**Prepared example.** Check the current compatibility table before choosing an advisor pair.
 
 ```json
 {

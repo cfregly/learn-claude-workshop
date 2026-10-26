@@ -1,0 +1,30 @@
+# JavaScript dependencies
+node_modules/
+**/node_modules/
+
+# Python environments and caches
+.venv/
+.venv*/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+
+# Runtime state
+.local/
+model-usage.json
+**/model-usage.json
+*.log
+*.pid
+*.tmp
+
+# Operating system files
+.DS_Store

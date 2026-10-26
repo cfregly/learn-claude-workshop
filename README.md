@@ -1,94 +1,86 @@
 # Learn Claude workshop
 
-This repository contains the public code, notebooks, fixtures, and teaching references for the Learn Claude workshop. Northstar Freight, its records, people, identifiers, traces, and decisions are fictional.
+This repository contains the complete public source for [learn.fluxcapacitor.dev](https://learn.fluxcapacitor.dev), plus standalone labs and teaching references. Northstar Freight, its records, people, identifiers, traces, and decisions are fictional.
 
-The live workshop is [learn.fluxcapacitor.dev](https://learn.fluxcapacitor.dev). It supports self-paced learning and facilitator-led sessions across twelve audience paths.
+The workshop uses one source set and one review standard across its audience paths. Engineers trace typed events, tool input, authorization, and failure boundaries. Account Executives check the same draft against its sources and decide whether it is ready for account planning. Generated drafts always require human source review.
 
-## What runs live
+## Run the app
 
-The live site's networked behavior is limited to bounded, text-only Claude Messages API requests for the fixed synthetic demo and the contextual Ask panel. It does not read customer systems, execute the prepared client tool, change records, send messages, or approve an action.
-
-The streaming and tool-use trace, thinking lesson, model-capability snapshot, and optional feature guide are prepared course materials. The examples teach citations, structured outputs, prompt caching, app-owned memory, Skills, read-only programmatic tool calling, the advanced advisor pattern, and input token counting. They do not show that those features ran on the live site.
-
-The Engineer and Account Executive paths inspect the same reviewed API draft and synthetic lineage. The Engineer traces access, credential, request, typed response, delivery, and recovery. The Account Executive checks the same draft against the records and decides whether it is ready for account planning. The Account Executive practice step then uses a separate, deliberately flawed draft so the learner can remove an unsupported discount claim. Claude for Work remains an optional alternate exercise.
-
-The optional live request returns text only. Streaming and tool use stay prepared teaching traces with synthetic events and receipts.
-
-Open the [diagnostics workshop](https://learn.fluxcapacitor.dev/#diagnose) to trace eight fixed synthetic cases across transport, backend, browser, UI, and client tool boundaries. The route replays prepared events and application observations. Its labels are not a provider wire capture, API measurement, or customer action.
-
-Starting a fresh independent diagnostic attempt saves the current answers in the learning record, then clears the active workspace. Evidence stays visible. Guidance and completed references stay closed until the learner commits one next check.
-
-## Start here
-
-1. Read the [Northstar source pack](docs/northstar-source-pack.md).
-2. Open the [API trace notebook](labs/api-trace.ipynb) and run its cells from top to bottom.
-3. Run the direct API client in offline mode:
-
-   ```bash
-   python3 labs/claude_api_demo.py
-   ```
-
-4. Open the [renewal-window starter lab](labs/northstar-renewals/starter/README.md), add the missing boundary test, and compare your work with the [reference fix](labs/northstar-renewals/REFERENCE_FIX.md).
-
-## Teaching references
-
-- [Claude for Work activity](docs/claude-for-work.md)
-- [Facilitator guide](docs/facilitator-guide.md)
-- [Incomplete response lesson](docs/incomplete-response.md)
-- [Diagnostic exercise instructor guide](docs/diagnostic-instructor-guide.md)
-- [Application hooks lab](docs/hooks-lab.md)
-- [Security and regulated workflow review](docs/security-workshop.md)
-- [Streaming and tool-use trace](docs/streaming-lab.md)
-- [Thinking lesson](docs/thinking-lab.md)
-- [Reviewed model-capability snapshot](docs/model-capabilities.json)
-- [Optional supporting features](docs/supporting-features.md)
-
-## Practice code
-
-- [Offline API trace notebook](labs/api-trace.ipynb)
-- [Direct Claude API client with offline default](labs/claude_api_demo.py)
-- [Direct API client offline tests](labs/test_claude_api_demo.py)
-- [Shared Engineer and Account Executive integration](labs/integration/shared-integration.js)
-- [Seven-step integration map](labs/integration/integration-map.js)
-- [Text-only live demo browser module](labs/live-api/public/live-demo.js)
-- [Prepared streaming and tool-use lab](labs/live-api/public/streaming-lab.js)
-- [Synthetic evaluation fixtures](labs/source-fixtures.json)
-- [Synthetic diagnostic replay](labs/diagnostics/diagnostics-lab.js)
-- [Diagnostic reference packets](labs/diagnostics/diagnostic-reference-packets.json)
-- [Offline hook dispatcher](labs/hook_dispatcher.py)
-- [Standalone live API lab](labs/live-api/README.md)
-- [Claude Code boundary lab](labs/northstar-renewals/README.md)
-- [Versioned renewal-brief Skill](labs/skills/renewal-brief/SKILL.md)
-
-The standalone live API lab contains the server and bounded request handler used by the site. It also includes focused tests that inject provider responses and make no paid model calls. The website interface is not part of this repository.
-
-## Direct runtime boundary
-
-The live app's editable source is `/opt/learn-claude-workshop/app` on `piq-runtime`. The isolated `learn-claude-workshop.service` watches that path. Its service identity, credential file, port, and model-usage ledger are separate from other applications on the host.
-
-Publishing this repository does not by itself change the running app. Runtime edits happen directly in `/opt/learn-claude-workshop/app`, followed by the focused checks for that service.
-
-## Offline validation
-
-Run the starter tests:
+Use Node.js 22 or later.
 
 ```bash
-cd labs/northstar-renewals/starter
-python3 -m unittest discover -s tests -q
+git clone https://github.com/cfregly/learn-claude-workshop.git
+cd learn-claude-workshop/app
+npm ci
+npm start
 ```
 
-Run the reference solution tests:
+Open `http://127.0.0.1:18120`. The site, replay, and offline materials work without an API key. Live features remain unavailable until the server receives approved `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` environment settings. Keep credentials out of source files and shell history.
+
+For local live use, point the bounded usage record to a writable ignored directory before starting the server:
 
 ```bash
-cd labs/northstar-renewals/solution
-python3 -m unittest discover -s tests -q
+export MODEL_BUDGET_FILE="$PWD/.local/model-usage.json"
+npm start
 ```
 
-Run the standalone API lab tests:
+## Replay and Live
+
+Replay is the repeatable teaching route. It uses fixed synthetic events, needs no API key, and includes happy, unauthorized, and interrupted cases.
+
+Live streams two real Claude Messages API responses. Between those calls, the application executes one read-only lookup against the bundled synthetic Northstar fixture. The lookup accepts only the fixed `northstar-freight` account. It does not connect to a CRM, read customer data, change a record, send a message, approve pricing, or take a customer action.
+
+The original text-only starter remains in [labs/claude_api_demo.py](labs/claude_api_demo.py). It is separate from both the prepared replay and the two-call live tool workflow.
+
+## Python streaming lab
+
+The Python lab is offline by default.
 
 ```bash
-cd labs/live-api
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-live.txt
+python labs/live-stream-tool-demo.py
+```
+
+After setting approved `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` environment values, opt into the bounded live path:
+
+```bash
+python labs/live-stream-tool-demo.py --live
+```
+
+Live mode makes at most two provider calls and one local read-only synthetic lookup. It preserves unknowns, stops on incomplete protocol states, and returns a draft for human review. See the [live streaming guide](docs/live-stream-tool-demo.md) for the event and failure contract.
+
+## Source layout
+
+- `app/` contains the runnable server, browser interface, served materials, package lock, and focused tests.
+- `docs/` contains the teaching guides rendered by the site and readable from the repository.
+- `labs/` contains the offline text starter, the Python streaming and tool lab, fixtures, integration examples, and the standalone backend lab.
+- `requirements-live.txt` pins the Python SDK used by the streaming lab.
+
+The copies under `app/public/materials/` are the files served by the app. Their matching `docs/` and `labs/` paths are the repository entry points linked from the interface.
+
+## Checks
+
+Run the complete app checks:
+
+```bash
+cd app
+npm ci
+npm run check
 npm test
 ```
 
-The notebook and default Python client use synthetic data and run offline. Keep credentials, customer data, and private notes out of this repository.
+Run the standalone backend checks:
+
+```bash
+cd labs/live-api
+npm ci
+npm test
+```
+
+The JavaScript tests inject provider responses and make no paid model calls. The default Python clients use synthetic data and make no network calls.
+
+## Direct runtime boundary
+
+The live app's editable source is `/opt/learn-claude-workshop/app` on `piq-runtime`. That source is updated and checked directly. Publishing this repository does not update the running app. A runtime update needs its own source sync, focused checks, and readback.

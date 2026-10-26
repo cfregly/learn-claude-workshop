@@ -12,7 +12,7 @@ export function initAskClaude({ getContext }) {
   let activeKey = ''
   let busy = false
   let current
-  const launcher = node('button', 'Ask about this', 'ask-launcher button secondary')
+  const launcher = node('button', 'Ask anything', 'ask-launcher button secondary')
   launcher.type = 'button'
   launcher.setAttribute('aria-haspopup', 'dialog')
   launcher.setAttribute('aria-controls', 'ask-claude')
@@ -20,7 +20,7 @@ export function initAskClaude({ getContext }) {
   panel.id = 'ask-claude'
   panel.setAttribute('aria-labelledby', 'ask-heading')
   const header = node('div', '', 'ask-header')
-  const heading = node('h2', 'Ask about this')
+  const heading = node('h2', 'Ask anything')
   heading.id = 'ask-heading'
   const close = node('button', 'Close', 'button quiet small')
   close.type = 'button'
