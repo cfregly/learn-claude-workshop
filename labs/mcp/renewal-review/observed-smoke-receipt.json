@@ -1,0 +1,99 @@
+{
+  "receipt_kind": "sanitized_observed_local_smoke",
+  "created_at": "2026-10-26T19:30:59.934838Z",
+  "status": "passed",
+  "sdk": {
+    "package": "mcp",
+    "version": "2.3.0"
+  },
+  "python_version": "3.14.6",
+  "platform": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "arm64"
+  },
+  "server_sha256": "23643ff5970be13fcbda6c5b870eb52e203eec97e6cb1bbbf566c3fae3e4e079",
+  "fixture_sha256": "63f765618c9a0c5e989ceec8c5c93b18ebcd9033c4fafa2ea2fcca15174c532f",
+  "source_hashes": {
+    "labs/mcp/renewal-review/server.py": "23643ff5970be13fcbda6c5b870eb52e203eec97e6cb1bbbf566c3fae3e4e079",
+    "labs/mcp/renewal-review/smoke.py": "6751384aa54b0a5ebe4f983a935c95c4db35df41aed59d63746f22e0c3084b39",
+    "labs/mcp/renewal-review/test_server.py": "b7a6b422dd470de0c5de8f392a8477cc7495b04e367c7701138dd211a914df11",
+    "labs/mcp/renewal-review/README.md": "cb093dc4f8c887e860540d5d4c8c444105e4aef61e5bd8b83e079259e63f3acc",
+    "labs/source-fixtures.json": "63f765618c9a0c5e989ceec8c5c93b18ebcd9033c4fafa2ea2fcca15174c532f"
+  },
+  "initialization": {
+    "server_name": "renewal_review",
+    "server_version": "1.0.0",
+    "protocol_version": "2025-11-25",
+    "tool_count": 1
+  },
+  "checks_are_require_gated_summary": true,
+  "checks": {
+    "initialize": true,
+    "list_tools": true,
+    "successful_read": true,
+    "denied_actor_before_fixture_read_in_process": true,
+    "denied_actor_received_stdio_error_result": true,
+    "extra_input_rejected": true,
+    "unexpected_account_rejected": true,
+    "unknown_tool_rejected": true,
+    "write_tool_rejected": true,
+    "owner_stdio_context_exit_clean": true,
+    "denied_stdio_context_exit_clean": true,
+    "initialize_probe_stdout_json_rpc_only": true,
+    "discount_unknown_preserved": true,
+    "sso_unknown_preserved": true
+  },
+  "observations": {
+    "stdout_probe": {
+      "scope": "one initialize request followed by input EOF",
+      "captured_nonempty_stdout_lines": 1,
+      "all_captured_stdout_lines_valid_json_rpc_2_0": true,
+      "server_process_return_code_after_eof": 0,
+      "protocol_version": "2025-11-25",
+      "server_stderr_present": false
+    },
+    "stdio_shutdown": {
+      "inference": "clean ClientSession and stdio_client context exit without exception",
+      "sdk_managed_child_return_code_observed": false
+    },
+    "owner_server_stderr_present": false,
+    "denied_server_stderr_present": false
+  },
+  "allowed_result": {
+    "synthetic": true,
+    "account_id": "northstar-freight",
+    "source_id": "source-fixtures.json#baseline",
+    "source_ids": [
+      "CRM",
+      "CALL",
+      "SUPPORT",
+      "USAGE"
+    ],
+    "notes": "[CRM] Northstar Freight renews on January 31, 2027. Maya Chen is the account owner. [CALL, October 14] Lena Ortiz, VP Ops, and Devon Price, IT, attended. Devon asked whether SSO is available, but the records contain no entitlement information. A security follow-up is needed, but no owner is recorded. A 12 percent discount was discussed. Approval is not recorded. [SUPPORT CASE 4821] Delayed shipment-alert emails remain open. [USAGE] Weekly active users are 64, down from 78 in the prior period.",
+    "access_checked": true,
+    "actor_id": "demo-account-owner"
+  },
+  "denied_initialization": {
+    "server_name": "renewal_review",
+    "server_version": "1.0.0",
+    "protocol_version": "2025-11-25",
+    "tool_count": 1
+  },
+  "limits": {
+    "transport": "stdio",
+    "tools": [
+      "lookup_northstar_account"
+    ],
+    "accounts": [
+      "northstar-freight"
+    ],
+    "actors": [
+      "demo-account-owner",
+      "demo-no-access"
+    ],
+    "network_calls": 0,
+    "model_calls": 0,
+    "write_tools": 0
+  }
+}

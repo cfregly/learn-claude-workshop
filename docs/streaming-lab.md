@@ -2,6 +2,8 @@
 
 This ten minute Northstar replay uses prepared synthetic events. It makes no network request, calls no model, and performs no account action.
 
+The event ordering and partial JSON explanations adapt the [official streaming documentation](https://platform.claude.com/docs/en/build-with-claude/streaming). The Northstar traces, task, and failure exercises apply those interfaces to this workshop. See [sources and attribution](source-and-attribution.md).
+
 ## Choose the replay or live route
 
 - **Replay for repeatable teaching and failures.** Stay in this lab at [Streaming events](https://learn.fluxcapacitor.dev/#streaming). Run the same happy, unauthorized, and interrupted traces without a credential or provider call.
@@ -209,11 +211,11 @@ At block stop, the application joins the fragments and parses:
 }
 ```
 
-The schema requires a non-empty `account_id` string and a non-empty string array named `fields`. Schema success makes the request well formed. It does not grant account access.
+The schema requires an `account_id` string and a string array named `fields`. It does not enforce non-empty values. Check those conditions before dispatch. Schema success does not grant account access.
 
 ## Application authorization and execution
 
-The application compares `acct_northstar` with the signed-in employee allowlist. Only a matching, schema-valid request can move from `proposed` to client tool execution.
+The prepared application state compares `acct_northstar` with the fixture employee allowlist. Only a matching, schema-valid request can move from `proposed` to client tool execution. This replay does not implement employee sign-in. The standalone MCP lab uses the equivalent fictional identifiers `northstar-freight` and `demo-account-owner`.
 
 The lab uses these application states:
 
@@ -317,7 +319,7 @@ Under `display: "updates"`, a `thinking` block with text is model progress narra
 }
 ```
 
-The typed progress block is separate from `text` and `tool_use` blocks. When streamed, its text arrives in an indexed `thinking_delta`:
+The typed progress block is separate from `text` and `tool_use` blocks. When streamed, its text arrives in an indexed `thinking_delta`. The following standalone illustration uses block index 2. It is not the earlier two-block replay message:
 
 ```json
 {
