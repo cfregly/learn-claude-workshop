@@ -2,7 +2,7 @@
 
 Use one fictional Northstar Freight task to see what each layer does. The goal is a source-bound renewal brief, with unresolved approvals left unresolved.
 
-Status on October 26, 2026: the local MCP smoke and offline tests have run. The native Skill bundle has not been uploaded or invoked through the Messages API. Its runner and response checker are configured and tested against authored response fixtures. Integration into the running workshop is separate work.
+Status on October 26, 2026: the local MCP smoke and offline tests have run. The native Skill bundle has not been uploaded or invoked through the Messages API. The request path is configured. The response checker is tested against authored response fixtures. Integration into the running workshop is separate work.
 
 ## The components
 
