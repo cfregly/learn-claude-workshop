@@ -26,18 +26,27 @@ The process reserves stdout for newline-delimited JSON-RPC. Diagnostics belong o
 ```bash
 /tmp/renewal-review-mcp-venv/bin/python labs/mcp/renewal-review/smoke.py \
   --python /tmp/renewal-review-mcp-venv/bin/python \
-  --export /tmp/northstar-mcp-result.json
+  --export /tmp/northstar-mcp-result.json \
+  --receipt /tmp/renewal-review-smoke-receipt.json
 ```
 
-The smoke initializes a real STDIO session, lists the one tool, performs the allowed lookup, rejects an extra actor field, rejects an unexpected account, rejects unknown and write tool names, checks the denied actor before a fixture read, and closes both server processes through the SDK transport.
+The smoke initializes real STDIO sessions, lists the one tool, performs the allowed lookup, rejects an extra actor field, rejects an unexpected account, and rejects unknown and write tool names. It checks in process that the denied actor never reaches the fixture reader. In a separate STDIO session it checks that the denied actor receives an error result.
+
+A scripted initialize probe captures the server process stdout directly. Every non-empty captured line must parse as a JSON-RPC 2.0 message. The probe covers one initialize request followed by input EOF. It records the server process return code for that probe. The SDK-managed owner and denied sessions expose clean context exit, not the child process return code. Their shutdown status is therefore an inference from `ClientSession` and `stdio_client` exiting without an exception.
 
 The exported allowed result is synthetic JSON for the separate Skill runner. It contains no credentials or answer-key field.
 
 ## Observed local validation
 
-The October 26, 2026 smoke used `mcp==2.3.0` and negotiated protocol `2025-11-25`. It passed initialization, discovery, the allowed lookup, rejected inputs and tool names, denied access before a fixture read, and orderly shutdown with JSON-RPC-only stdout. Six focused server tests also passed. These observations establish local protocol behavior for this version.
+The published [sanitized smoke receipt](observed-smoke-receipt.json) records one observed local run. It includes the timestamp, SDK and protocol versions, Python and platform values, final source hashes, the allowed synthetic result, and bounded observations. Its `checks` object is a require-gated summary. A true value means the corresponding assertion completed without failure. It is not a separate measurement stream.
+
+The actual stdout claim is limited to the captured initialize probe. The static server test separately checks that application code contains no `print` or `sys.stdout` call. The receipt labels the owner and denied session shutdown result as a clean-context-exit inference.
+
+Seven focused tests cover the original six server behaviors and rejection of non-JSON-RPC stdout by the new probe validator.
 
 The startup actor is a fixture role selected by the process launcher. It is not an authenticated employee identity. `access_checked` records the local allowlist decision, and `source_ids` are labels within fictional notes. They do not establish reads from external CRM, call, support, or usage systems.
+
+This implementation was checked against `mcp==2.3.0`. `ToolAnnotations` uses the SDK model's snake case field names and the SDK serializes their protocol aliases. The `list_tools` and `call_tool` overrides follow the method signatures inspected in that SDK release.
 
 ## Interface
 

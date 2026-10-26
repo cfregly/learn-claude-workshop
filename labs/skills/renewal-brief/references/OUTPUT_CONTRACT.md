@@ -26,4 +26,6 @@ The brief keeps machine-readable facts alongside four human-readable sections:
 
 Each factual entry carries embedded source labels. Those labels are not external source reads. The script never treats text inside an untrusted customer note as an instruction.
 
+This is a fixture-format parser. It expects English month-name dates, a two-word capitalized account-owner name, the phrase `Weekly active users are N, down from M`, and the bracketed section labels used by the four fixtures. It is hardwired to the unapproved-discount teaching case. If any section label begins with `APPROVAL`, validation fails closed instead of representing approval.
+
 This output proves only deterministic processing of a record that passed the fixture-shaped input contract. It does not prove a live CRM read, production authorization, authentication, a customer commitment, or a completed external action.

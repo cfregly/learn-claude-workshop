@@ -5,11 +5,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import importlib.metadata
 import importlib.util
 import json
+import platform
+import subprocess
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -20,6 +24,10 @@ from mcp.client.stdio import stdio_client
 
 HERE = Path(__file__).resolve().parent
 SERVER_PATH = HERE / "server.py"
+SMOKE_PATH = Path(__file__).resolve()
+TEST_PATH = HERE / "test_server.py"
+README_PATH = HERE / "README.md"
+FIXTURE_PATH = HERE.parents[1] / "source-fixtures.json"
 
 
 def load_server_module() -> ModuleType:
@@ -37,7 +45,69 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-async def exercise_stdio(python: str, actor: str) -> tuple[dict[str, Any], str]:
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def validate_json_rpc_stdout(stdout: str) -> list[dict[str, Any]]:
+    lines = [line for line in stdout.splitlines() if line.strip()]
+    require(bool(lines), "server stdout probe returned no JSON-RPC messages")
+    messages: list[dict[str, Any]] = []
+    for index, line in enumerate(lines, start=1):
+        try:
+            message = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise AssertionError(f"server stdout line {index} is not JSON") from error
+        require(isinstance(message, dict), f"server stdout line {index} is not a JSON object")
+        require(message.get("jsonrpc") == "2.0", f"server stdout line {index} is not JSON-RPC 2.0")
+        has_method = isinstance(message.get("method"), str)
+        has_response = "id" in message and (("result" in message) != ("error" in message))
+        require(has_method or has_response, f"server stdout line {index} has no JSON-RPC message shape")
+        messages.append(message)
+    return messages
+
+
+def probe_server_stdout(python: str) -> dict[str, Any]:
+    request = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "renewal-review-stdout-probe", "version": "1.0.0"},
+        },
+    }
+    completed = subprocess.run(
+        [python, str(SERVER_PATH), "--actor", "demo-account-owner"],
+        input=json.dumps(request, separators=(",", ":")) + "\n",
+        text=True,
+        capture_output=True,
+        cwd=HERE,
+        timeout=10,
+        check=False,
+    )
+    require(completed.returncode == 0, "server stdout probe did not exit cleanly after input EOF")
+    messages = validate_json_rpc_stdout(completed.stdout)
+    response = next((message for message in messages if message.get("id") == 1), None)
+    require(response is not None and "result" in response, "server stdout probe has no initialize result")
+    result = response["result"]
+    require(isinstance(result, dict), "initialize probe result is not an object")
+    return {
+        "scope": "one initialize request followed by input EOF",
+        "captured_nonempty_stdout_lines": len(messages),
+        "all_captured_stdout_lines_valid_json_rpc_2_0": True,
+        "server_process_return_code_after_eof": completed.returncode,
+        "protocol_version": result.get("protocolVersion"),
+        "server_stderr_present": bool(completed.stderr),
+    }
+
+
+async def exercise_stdio(python: str, actor: str) -> dict[str, Any]:
     parameters = StdioServerParameters(
         command=python,
         args=[str(SERVER_PATH), "--actor", actor],
@@ -106,9 +176,15 @@ async def exercise_stdio(python: str, actor: str) -> tuple[dict[str, Any], str]:
             print(server_stderr.read(), file=sys.stderr, end="")
             raise
 
+        context_exit_clean = True
         server_stderr.seek(0)
-        stderr_text = server_stderr.read()
-    return {"initialization": initialization, "result": allowed_result}, stderr_text
+        stderr_present = bool(server_stderr.read())
+    return {
+        "initialization": initialization,
+        "result": allowed_result,
+        "context_exit_clean": context_exit_clean,
+        "server_stderr_present": stderr_present,
+    }
 
 
 async def run_smoke(python: str) -> dict[str, Any]:
@@ -129,8 +205,9 @@ async def run_smoke(python: str) -> dict[str, Any]:
         raise AssertionError("denied in-process lookup did not fail")
     require(reads == 0 and denied_store.fixture_reads == 0, "denied actor read the fixture")
 
-    owner, owner_stderr = await exercise_stdio(python, "demo-account-owner")
-    denied, denied_stderr = await exercise_stdio(python, "demo-no-access")
+    stdout_probe = probe_server_stdout(python)
+    owner = await exercise_stdio(python, "demo-account-owner")
+    denied = await exercise_stdio(python, "demo-no-access")
     result = owner["result"]
     expected_keys = {
         "synthetic",
@@ -151,26 +228,57 @@ async def run_smoke(python: str) -> dict[str, Any]:
     require("Approval is not recorded" in result["notes"], "discount unknown was lost")
     require("no entitlement information" in result["notes"], "SSO unknown was lost")
 
-    parse_error_marker = "Failed to parse JSONRPC message from server"
-    require(parse_error_marker not in owner_stderr + denied_stderr, "server wrote non-JSON-RPC data to stdout")
+    require(owner["context_exit_clean"] is True, "owner STDIO transport context did not exit cleanly")
+    require(denied["context_exit_clean"] is True, "denied STDIO transport context did not exit cleanly")
+
+    source_hashes = {
+        "labs/mcp/renewal-review/server.py": sha256_file(SERVER_PATH),
+        "labs/mcp/renewal-review/smoke.py": sha256_file(SMOKE_PATH),
+        "labs/mcp/renewal-review/test_server.py": sha256_file(TEST_PATH),
+        "labs/mcp/renewal-review/README.md": sha256_file(README_PATH),
+        "labs/source-fixtures.json": sha256_file(FIXTURE_PATH),
+    }
 
     return {
+        "receipt_kind": "sanitized_observed_local_smoke",
+        "created_at": utc_now(),
         "status": "passed",
         "sdk": {"package": "mcp", "version": importlib.metadata.version("mcp")},
+        "python_version": platform.python_version(),
+        "platform": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "machine": platform.machine(),
+        },
+        "server_sha256": source_hashes["labs/mcp/renewal-review/server.py"],
+        "fixture_sha256": source_hashes["labs/source-fixtures.json"],
+        "source_hashes": source_hashes,
         "initialization": owner["initialization"],
+        "checks_are_require_gated_summary": True,
         "checks": {
             "initialize": True,
             "list_tools": True,
             "successful_read": True,
-            "denied_before_fixture_read": True,
+            "denied_actor_before_fixture_read_in_process": True,
+            "denied_actor_received_stdio_error_result": True,
             "extra_input_rejected": True,
             "unexpected_account_rejected": True,
             "unknown_tool_rejected": True,
             "write_tool_rejected": True,
-            "orderly_stdio_shutdown": True,
-            "stdout_json_rpc_only": True,
+            "owner_stdio_context_exit_clean": owner["context_exit_clean"],
+            "denied_stdio_context_exit_clean": denied["context_exit_clean"],
+            "initialize_probe_stdout_json_rpc_only": True,
             "discount_unknown_preserved": True,
             "sso_unknown_preserved": True,
+        },
+        "observations": {
+            "stdout_probe": stdout_probe,
+            "stdio_shutdown": {
+                "inference": "clean ClientSession and stdio_client context exit without exception",
+                "sdk_managed_child_return_code_observed": False,
+            },
+            "owner_server_stderr_present": owner["server_stderr_present"],
+            "denied_server_stderr_present": denied["server_stderr_present"],
         },
         "allowed_result": result,
         "denied_initialization": denied["initialization"],

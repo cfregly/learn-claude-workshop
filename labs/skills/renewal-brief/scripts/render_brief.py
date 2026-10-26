@@ -113,6 +113,7 @@ def _extract_facts(
     discount_approved = any(
         label.upper().startswith("APPROVAL") for label, _ in sections
     )
+    discount_approval_not_recorded = "approval is not recorded" in call.lower()
 
     if "SSO" not in call:
         sso_status = "not_in_source"
@@ -130,6 +131,7 @@ def _extract_facts(
         "security_owner": "unknown" if "no owner is recorded" in call else "unresolved",
         "discount_percent_discussed": discount_percent,
         "discount_approved": discount_approved,
+        "discount_approval_not_recorded": discount_approval_not_recorded,
         "open_support_case": case_number,
         "open_support_summary": support,
         "weekly_active_users": weekly_active,
@@ -186,7 +188,15 @@ def build_brief(record: dict[str, Any]) -> dict[str, Any]:
         {
             "text": (
                 f"Is the {facts['discount_percent_discussed']} percent discount approved? "
-                "The current record says approval is not recorded."
+                + (
+                    "An APPROVAL section is present, which this fixture renderer rejects."
+                    if facts["discount_approved"]
+                    else (
+                        "The CALL section says approval is not recorded."
+                        if facts["discount_approval_not_recorded"]
+                        else "The CALL section does not state the approval status."
+                    )
+                )
             ),
             "source_ids": ["CALL"],
         },
@@ -235,7 +245,7 @@ def build_brief(record: dict[str, Any]) -> dict[str, Any]:
             {
                 "owner": facts["account_owner"],
                 "text": "Resolve the conflicting renewal dates before a customer-facing commitment.",
-                "source_ids": ["CRM", "UNVERIFIED_OLD_NOTE"],
+                "source_ids": sorted({item["source_id"] for item in date_sources}),
                 "status": "proposed",
             },
         )

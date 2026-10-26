@@ -63,6 +63,9 @@ Live mode makes at most two provider calls and one local read-only synthetic loo
 - `docs/` contains the teaching guides rendered by the site and readable from the repository.
 - `labs/` contains the offline text starter, the Python streaming and tool lab, fixtures, integration examples, and the standalone backend lab.
 - `requirements-live.txt` pins the Python SDK used by the streaming lab.
+- `labs/mcp/renewal-review/` contains the standalone read-only MCP lab and local smoke.
+- `labs/skills/renewal-brief/` contains the Skill bundle, offline checks, and opt-in native API runners.
+- `requirements-mcp.txt` and `requirements-skills.txt` pin the respective top-level SDK versions. They do not lock transitive dependencies.
 
 The copies under `app/public/materials/` are the files served by the app. Their matching `docs/` and `labs/` paths are the repository entry points linked from the interface.
 
@@ -89,4 +92,4 @@ The JavaScript tests inject provider responses and make no paid model calls. The
 
 ## Direct runtime boundary
 
-The live app's editable source is `/opt/learn-claude-workshop/app` on `piq-runtime`. That source is updated and checked directly. Publishing this repository does not update the running app. A runtime update needs its own source sync, focused checks, and readback.
+Publishing this repository does not update the running app. Runtime integration needs its own source sync, focused checks, and readback.

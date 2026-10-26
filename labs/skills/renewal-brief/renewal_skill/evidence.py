@@ -158,7 +158,7 @@ def _script_path(name: str, tool_input: dict[str, Any]) -> str | None:
         return None
     if tokens[2:4] != ["--records-file", "/tmp/renewal-records.json"]:
         return None
-    if tokens[4] != "--output" or tokens[5] != "$OUTPUT_DIR/renewal-brief.json":
+    if tokens[4] != "--output" or tokens[5] != "/tmp/renewal-brief.json":
         return None
     return script_path
 
@@ -321,7 +321,7 @@ def build_evidence(
         str(block.get("text", ""))
         for block in content
         if isinstance(block, dict) and block.get("type") == "text"
-    )[:16_000]
+    )
 
     proof_passed = all(
         (
@@ -339,6 +339,8 @@ def build_evidence(
     return {
         "schema_version": 1,
         "provider_calls": 1,
+        "messages_method_invocations": 1,
+        "provider_response_received": True,
         "request": {
             "model": requested_model,
             "output_config": {"effort": requested_effort},
@@ -372,7 +374,9 @@ def build_evidence(
                 "expires_at": container.get("expires_at"),
                 "skills": loaded_skills,
             },
-            "final_text": final_text,
+            "final_text_sha256": hashlib.sha256(final_text.encode("utf-8")).hexdigest(),
+            "final_text_char_count": len(final_text),
+            "final_text_persisted": False,
         },
         "code_execution": {"internal_steps": len(steps), "steps": steps},
         "skill_access_proof": {
@@ -390,7 +394,9 @@ def build_evidence(
             "deterministic_output": rendered_output,
             "proof_scope": (
                 "API response evidence for one resolved native Skill container and mounted bytes. "
-                "The upload pin alone is not cryptographic provider-byte proof."
+                "The upload pin alone is not cryptographic provider-byte proof. Command matching "
+                "cannot detect shell functions defined in earlier steps. The hash check and script "
+                "run are not atomic. The trust anchor is the sandbox-produced tool result."
             ),
         },
         "privacy": {

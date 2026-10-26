@@ -11,11 +11,17 @@ from pathlib import Path
 
 
 SERVER_PATH = Path(__file__).with_name("server.py")
+SMOKE_PATH = Path(__file__).with_name("smoke.py")
 SPEC = importlib.util.spec_from_file_location("renewal_review_server", SERVER_PATH)
 assert SPEC and SPEC.loader
 server_module = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = server_module
 SPEC.loader.exec_module(server_module)
+SMOKE_SPEC = importlib.util.spec_from_file_location("renewal_review_smoke", SMOKE_PATH)
+assert SMOKE_SPEC and SMOKE_SPEC.loader
+smoke_module = importlib.util.module_from_spec(SMOKE_SPEC)
+sys.modules[SMOKE_SPEC.name] = smoke_module
+SMOKE_SPEC.loader.exec_module(smoke_module)
 
 
 class RenewalReviewServerTests(unittest.IsolatedAsyncioTestCase):
@@ -83,6 +89,10 @@ class RenewalReviewServerTests(unittest.IsolatedAsyncioTestCase):
         source = SERVER_PATH.read_text(encoding="utf-8")
         self.assertNotIn("print(", source)
         self.assertNotIn("sys.stdout", source)
+
+    def test_stdout_probe_rejects_non_json_rpc_output(self) -> None:
+        with self.assertRaises(AssertionError):
+            smoke_module.validate_json_rpc_stdout("startup banner\n")
 
 
 if __name__ == "__main__":

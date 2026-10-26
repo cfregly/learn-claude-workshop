@@ -15,17 +15,17 @@ Use only the application-provided record. It must be synthetic, access checked, 
    cat /skills/renewal-brief/SKILL.md
    ```
 
-2. Save the exact application-provided JSON record to a temporary file. Do not add facts or an answer key.
+2. Save the exact application-provided JSON record to `/tmp/renewal-records.json`. Use exactly that path. Do not add facts or an answer key.
 3. Verify the two executable bundled files with this standalone command:
 
    ```bash
    sha256sum /skills/renewal-brief/scripts/contract.py /skills/renewal-brief/scripts/render_brief.py
    ```
 
-4. Run this standalone command:
+4. Run this standalone command exactly as shown. Use `python`, not another interpreter command. Do not add a pipe, redirect, wrapper, or comment.
 
    ```bash
-   python /skills/renewal-brief/scripts/render_brief.py --records-file /tmp/renewal-records.json --output "$OUTPUT_DIR/renewal-brief.json"
+   python /skills/renewal-brief/scripts/render_brief.py --records-file /tmp/renewal-records.json --output /tmp/renewal-brief.json
    ```
 
 5. Use the script's `RENEWAL_BRIEF_OUTPUT` JSON as the brief. Do not replace it with a narrated or independently generated brief.

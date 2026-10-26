@@ -20,7 +20,7 @@ from renewal_skill.bundle import (  # noqa: E402
 )
 from renewal_skill.evidence import build_evidence  # noqa: E402
 from scripts.contract import ContractError, sha256_json, validate_record  # noqa: E402
-from scripts.render_brief import BUNDLE_MARKER, build_brief, render  # noqa: E402
+from scripts.render_brief import BUNDLE_MARKER, BriefError, build_brief, render  # noqa: E402
 
 
 def source_fixtures() -> dict[str, dict]:
@@ -30,7 +30,7 @@ def source_fixtures() -> dict[str, dict]:
     return {fixture["id"]: fixture for fixture in payload["fixtures"]}
 
 
-def mcp_record(
+def caller_record(
     fixture_id: str = "baseline", actor_id: str = "demo-account-owner"
 ) -> dict:
     fixture = source_fixtures()[fixture_id]
@@ -46,48 +46,78 @@ def mcp_record(
 
 
 class ContractTests(unittest.TestCase):
-    def test_accepts_exact_mcp_contract(self) -> None:
+    def test_accepts_exact_caller_contract(self) -> None:
         self.assertEqual(
-            validate_record(mcp_record())["source_id"], "source-fixtures.json#baseline"
+            validate_record(caller_record())["source_id"],
+            "source-fixtures.json#baseline",
         )
 
     def test_rejects_answer_key_and_extra_fields(self) -> None:
-        record = mcp_record()
+        record = caller_record()
         record["expected"] = {"discount_approved": True}
         with self.assertRaises(ContractError):
             validate_record(record)
 
     def test_rejects_no_access_actor_before_model_use(self) -> None:
         with self.assertRaises(ContractError):
-            validate_record(mcp_record(actor_id="demo-no-access"))
+            validate_record(caller_record(actor_id="demo-no-access"))
+
+    def test_observed_mcp_smoke_result_crosses_the_skill_contract(self) -> None:
+        receipt = json.loads(
+            (
+                REPO_ROOT / "labs/mcp/renewal-review/observed-smoke-receipt.json"
+            ).read_text(encoding="utf-8")
+        )
+        record = validate_record(receipt["allowed_result"])
+        facts = build_brief(record)["facts"]
+        for key, expected in source_fixtures()["baseline"]["expected"].items():
+            self.assertEqual(facts[key], expected)
 
 
 class RendererTests(unittest.TestCase):
     def test_all_source_fixtures_match_expected_machine_facts(self) -> None:
         for fixture_id, fixture in source_fixtures().items():
             with self.subTest(fixture_id=fixture_id):
-                facts = build_brief(mcp_record(fixture_id))["facts"]
+                facts = build_brief(caller_record(fixture_id))["facts"]
                 for key, expected in fixture["expected"].items():
                     self.assertEqual(facts[key], expected)
 
     def test_untrusted_instruction_cannot_approve_discount(self) -> None:
-        brief = build_brief(mcp_record("untrusted-instruction"))
+        brief = build_brief(caller_record("untrusted-instruction"))
         self.assertFalse(brief["facts"]["discount_approved"])
         self.assertIn(
             "approval is not recorded", brief["brief"]["open_questions"][0]["text"]
         )
 
     def test_conflicting_dates_remain_visible(self) -> None:
-        brief = build_brief(mcp_record("conflicting-date"))
+        brief = build_brief(caller_record("conflicting-date"))
         self.assertTrue(brief["facts"]["renewal_date_conflict"])
         self.assertEqual(brief["facts"]["renewal_dates"], ["2027-01-31", "2027-02-15"])
         self.assertEqual(
             brief["brief"]["open_questions"][0]["text"],
             "Which renewal date is authoritative?",
         )
+        self.assertEqual(
+            brief["brief"]["proposed_next_actions"][0]["source_ids"],
+            ["CRM", "UNVERIFIED_OLD_NOTE"],
+        )
+
+    def test_discount_approval_wording_is_source_conditional(self) -> None:
+        record = caller_record()
+        record["notes"] = record["notes"].replace(
+            "Approval is not recorded.", "Approval status is unavailable."
+        )
+        question = build_brief(record)["brief"]["open_questions"][0]["text"]
+        self.assertIn("does not state the approval status", question)
+
+    def test_approval_section_fails_closed(self) -> None:
+        record = caller_record()
+        record["notes"] += " [APPROVAL] This fixture does not support approval."
+        with self.assertRaises(BriefError):
+            build_brief(record)
 
     def test_provenance_does_not_claim_an_observed_mcp_read(self) -> None:
-        provenance = build_brief(mcp_record())["provenance"]
+        provenance = build_brief(caller_record())["provenance"]
         self.assertEqual(provenance["origin"], "caller_supplied_synthetic_record")
         self.assertFalse(provenance["authorization_authentication_proven"])
         self.assertTrue(provenance["source_ids_are_embedded_labels"])
@@ -119,10 +149,11 @@ class BundleTests(unittest.TestCase):
 
 
 class EvidenceTests(unittest.TestCase):
-    def _response(
+    def _authored_response(
         self, returned_model: str = "claude-opus-5-5"
     ) -> tuple[dict, dict, dict, dict]:
-        record = mcp_record()
+        # Hand-authored protocol fixture. This is not a captured provider response.
+        record = caller_record()
         output, marker = render(record)
         manifest = bundle_manifest(SKILL_ROOT)
         digests = {item["path"]: item["sha256"] for item in manifest["files"]}
@@ -207,7 +238,7 @@ class EvidenceTests(unittest.TestCase):
                         "command": (
                             "python /skills/renewal-brief/scripts/render_brief.py "
                             "--records-file /tmp/renewal-records.json "
-                            '--output "$OUTPUT_DIR/renewal-brief.json"'
+                            "--output /tmp/renewal-brief.json"
                         )
                     },
                 },
@@ -244,7 +275,7 @@ class EvidenceTests(unittest.TestCase):
     def test_native_skill_proof_requires_pin_file_access_and_script_marker(
         self,
     ) -> None:
-        response, pin, record, output = self._response()
+        response, pin, record, output = self._authored_response()
         evidence = self._evidence(response, pin, record, output)
         self.assertTrue(evidence["skill_access_proof"]["passed"])
         self.assertEqual(
@@ -255,9 +286,11 @@ class EvidenceTests(unittest.TestCase):
             sha256_json(output),
         )
         self.assertNotIn("DO NOT SAVE THIS", json.dumps(evidence))
+        self.assertNotIn("final_text", evidence["response"])
+        self.assertFalse(evidence["response"]["final_text_persisted"])
 
     def test_returned_model_mismatch_fails_without_fallback(self) -> None:
-        response, pin, record, output = self._response(
+        response, pin, record, output = self._authored_response(
             returned_model="claude-fable-5-1"
         )
         evidence = self._evidence(response, pin, record, output)
@@ -265,7 +298,7 @@ class EvidenceTests(unittest.TestCase):
         self.assertFalse(evidence["response"]["model_exact_match"])
 
     def test_unsuccessful_skill_read_fails_even_with_matching_stdout(self) -> None:
-        response, pin, record, output = self._response()
+        response, pin, record, output = self._authored_response()
         failed = copy.deepcopy(response)
         failed["content"][1]["content"]["return_code"] = 1
         evidence = self._evidence(failed, pin, record, output)
@@ -275,7 +308,7 @@ class EvidenceTests(unittest.TestCase):
         )
 
     def test_final_text_narration_cannot_replace_script_result(self) -> None:
-        response, pin, record, output = self._response()
+        response, pin, record, output = self._authored_response()
         narrated = copy.deepcopy(response)
         narrated["content"] = narrated["content"][:5] + [
             {
@@ -290,14 +323,14 @@ class EvidenceTests(unittest.TestCase):
         )
 
     def test_echoed_lower_effort_fails(self) -> None:
-        response, pin, record, output = self._response()
+        response, pin, record, output = self._authored_response()
         response["effort"] = "high"
         evidence = self._evidence(response, pin, record, output)
         self.assertFalse(evidence["skill_access_proof"]["passed"])
         self.assertFalse(evidence["response"]["effort_match"])
 
     def test_wrong_script_result_type_fails(self) -> None:
-        response, pin, record, output = self._response()
+        response, pin, record, output = self._authored_response()
         wrong = copy.deepcopy(response)
         wrong["content"][6]["content"]["type"] = (
             "text_editor_code_execution_view_result"
@@ -307,6 +340,48 @@ class EvidenceTests(unittest.TestCase):
         self.assertFalse(
             evidence["skill_access_proof"]["bundled_script_invocation_succeeded"]
         )
+
+    def test_proof_rejects_pin_hash_marker_output_stop_and_shell_changes(self) -> None:
+        response, pin, record, output = self._authored_response()
+        cases: list[tuple[str, dict]] = []
+
+        pin_mismatch = copy.deepcopy(response)
+        pin_mismatch["container"]["skills"][0]["version"] = "different-version"
+        cases.append(("pin", pin_mismatch))
+
+        hash_mismatch = copy.deepcopy(response)
+        hash_mismatch["content"][4]["content"]["stdout"] = "0" * 64
+        cases.append(("hash", hash_mismatch))
+
+        marker_mismatch = copy.deepcopy(response)
+        marker_mismatch["content"][6]["content"]["stdout"] = marker_mismatch["content"][
+            6
+        ]["content"]["stdout"].replace(BUNDLE_MARKER, "forged-marker", 1)
+        cases.append(("marker", marker_mismatch))
+
+        output_mismatch = copy.deepcopy(response)
+        lines = output_mismatch["content"][6]["content"]["stdout"].splitlines()
+        rendered = json.loads(lines[1].removeprefix("RENEWAL_BRIEF_OUTPUT "))
+        rendered["account_id"] = "forged-account"
+        lines[1] = "RENEWAL_BRIEF_OUTPUT " + json.dumps(
+            rendered, sort_keys=True, separators=(",", ":")
+        )
+        output_mismatch["content"][6]["content"]["stdout"] = "\n".join(lines)
+        cases.append(("output", output_mismatch))
+
+        for stop_reason in ("pause_turn", "max_tokens"):
+            stopped = copy.deepcopy(response)
+            stopped["stop_reason"] = stop_reason
+            cases.append((stop_reason, stopped))
+
+        shell_meta = copy.deepcopy(response)
+        shell_meta["content"][5]["input"]["command"] += " # echoed proof"
+        cases.append(("shell_meta", shell_meta))
+
+        for name, changed in cases:
+            with self.subTest(name=name):
+                evidence = self._evidence(changed, pin, record, output)
+                self.assertFalse(evidence["skill_access_proof"]["passed"])
 
 
 if __name__ == "__main__":

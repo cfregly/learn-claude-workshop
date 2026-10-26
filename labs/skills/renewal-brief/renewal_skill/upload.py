@@ -29,9 +29,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pin-file", type=Path, required=True)
     parser.add_argument("--existing-skill-id")
     parser.add_argument("--display-name", default="Renewal Brief")
-    parser.add_argument(
-        "--workspace-id", default=os.environ.get("ANTHROPIC_WORKSPACE_ID")
-    )
     parser.add_argument("--timeout-seconds", type=float, default=120.0)
     parser.add_argument("--confirm-upload", required=True)
     return parser.parse_args()
@@ -59,8 +56,6 @@ def main() -> int:
     operation: str
     with staged_bundle(args.skill_root) as staged:
         request: dict[str, Any] = {"files": files_from_dir(staged)}
-        if args.workspace_id:
-            request["workspace_id"] = args.workspace_id
         if args.existing_skill_id:
             operation = "create_version"
             result = client.skills.versions.create(
