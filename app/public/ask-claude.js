@@ -331,12 +331,18 @@ function installContextActions({open, panel}) {
         ownAction?.remove()
         continue
       }
-      if (ownAction) continue
+      if (ownAction) {
+        ownAction.setAttribute('aria-label', `Ask about ${widgetLabel(widget)}`)
+        continue
+      }
       const action = node('button', 'Ask', 'ask-widget-button button quiet small')
       action.type = 'button'
-      const label = widgetLabel(widget)
-      action.setAttribute('aria-label', `Ask about ${label}`)
-      action.addEventListener('click', () => open({text:widgetContent(widget),label,trigger:action}))
+      action.setAttribute('aria-label', `Ask about ${widgetLabel(widget)}`)
+      action.addEventListener('click', () => {
+        const label = widgetLabel(widget)
+        action.setAttribute('aria-label', `Ask about ${label}`)
+        open({text:widgetContent(widget),label,trigger:action})
+      })
       if (toolbar) toolbar.append(action)
       else if (widget.matches('details')) widget.querySelector('summary')?.after(action)
       else widget.prepend(action)

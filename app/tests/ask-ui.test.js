@@ -341,3 +341,40 @@ test('route replacement restores one Ask action with the current passage', async
   assert.equal(excerptText.textContent, 'Replacement passage with current evidence.')
   assert.doesNotMatch(excerptText.textContent, /Original route passage/)
 })
+
+test('retained integration action refreshes its heading label before opening Ask', async t => {
+  const { document } = setup(t, async () => { throw new Error('fetch should not run') })
+  const integration = document.createElement('section')
+  integration.className = 'integration-map-host'
+  const heading = document.createElement('h3')
+  heading.textContent = 'Check caller access'
+  const passage = document.createElement('p')
+  passage.textContent = 'Reject an account outside the allowlist.'
+  integration.append(heading, passage)
+  document.body.append(integration)
+
+  initAskClaude({ getContext: () => ({
+    context: { route: 'lesson', role_id: 'software-engineer-api', step: 2 },
+    label: 'Engineer · Demonstration',
+    suggestions: []
+  }) })
+  const originalAction = integration.children.find(child => child.classList.contains('ask-widget-button'))
+  assert.equal(originalAction.getAttribute('aria-label'), 'Ask about Check caller access')
+
+  heading.textContent = 'Parse typed response blocks'
+  passage.textContent = 'Read text only from typed response content.'
+  TestMutationObserver.instances.at(-1).trigger([{ target: integration, addedNodes: [] }])
+
+  const actions = integration.children.filter(child => child.classList.contains('ask-widget-button'))
+  assert.equal(actions.length, 1)
+  assert.equal(actions[0], originalAction)
+  assert.equal(originalAction.getAttribute('aria-label'), 'Ask about Parse typed response blocks')
+  await originalAction.click()
+
+  const panel = find(document.body, node => node.id === 'ask-claude')
+  const excerptLabel = find(panel, node => node.id === 'ask-excerpt-label')
+  const excerptText = find(panel, node => node.classList?.contains('ask-excerpt-text'))
+  assert.equal(excerptLabel.textContent, 'Parse typed response blocks')
+  assert.match(excerptText.textContent, /Read text only from typed response content\./)
+  assert.doesNotMatch(excerptText.textContent, /Reject an account outside the allowlist/)
+})
