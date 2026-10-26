@@ -38,7 +38,7 @@ export function createServer(options = {}) {
       if(pathname==='/api/health') {
         if(!['GET','HEAD'].includes(request.method)) return send(405,'Method not allowed',{'Allow':'GET, HEAD'})
         const demo = await liveDemo.capabilities()
-        return send(200,JSON.stringify({status:'ok',workshop:'northstar',mode:demo.available?'live-and-reference':'reference-exercises',live_demo:{available:demo.available,configured:demo.configured,reason:demo.reason},version:process.env.RELEASE_ID||'development'}),{'Content-Type':'application/json','Cache-Control':'no-store'})
+        return send(200,JSON.stringify({status:'ok',workshop:'learn-claude-workshop',mode:demo.available?'live-and-reference':'reference-exercises',live_demo:{available:demo.available,configured:demo.configured,reason:demo.reason},version:process.env.RELEASE_ID||'development'}),{'Content-Type':'application/json','Cache-Control':'no-store'})
       }
       if(!['GET','HEAD'].includes(request.method)) return send(405,'Method not allowed',{'Allow':'GET, HEAD'})
       if(pathname.startsWith('/api/')) return send(404,JSON.stringify({error:'No live model request was made. Use the downloadable API lab in your own environment.'}),{'Content-Type':'application/json'})

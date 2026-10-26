@@ -170,6 +170,7 @@ test('reports live capability without revealing a credential and keeps health ac
   assert.equal(JSON.stringify(capability).includes('ANTHROPIC_API_KEY'), false)
 
   const health = await (await fetch(`${origin}/api/health`)).json()
+  assert.equal(health.workshop, 'learn-claude-workshop')
   assert.equal(health.mode, 'reference-exercises')
   assert.deepEqual(health.live_demo, { available: false, configured: false, reason: 'not_configured' })
 })
