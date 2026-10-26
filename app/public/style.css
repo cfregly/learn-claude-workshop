@@ -69,6 +69,9 @@
   .code-block-wrap .code-token { color: inherit; }
 }
 .ask-launcher { position: fixed; right: 24px; bottom: 20px; z-index: 20; min-height: 44px; box-shadow: 0 4px 18px rgba(0,0,0,.10); }
+.button.secondary.ask-launcher,
+.button.secondary.ask-launcher:hover,
+.button.secondary.ask-launcher:focus-visible { background: var(--paper); color: var(--ink); }
 [hidden] { display: none !important; }
 .ask-panel { width: min(460px,calc(100vw - 32px)); height: calc(100dvh - 32px); max-height: calc(100dvh - 32px); max-width: calc(100vw - 32px); margin: 16px 16px 16px auto; padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); box-shadow: 0 12px 44px rgba(0,0,0,.18); overflow-y: auto; }
 .ask-panel::backdrop { background: #172a382e; }

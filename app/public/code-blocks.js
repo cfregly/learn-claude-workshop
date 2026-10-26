@@ -114,6 +114,20 @@ export function tokenizeCode(text, language = '') {
 }
 
 function renderCode(pre, source, language) {
+  if (language !== 'json') {
+    const existingCode = Array.from(pre.children).find(child => child.matches?.('code'))
+    if (existingCode) {
+      renderedBlocks.set(pre, { code: existingCode, source, language })
+      return false
+    }
+
+    const code = pre.ownerDocument.createElement('code')
+    code.append(...Array.from(pre.childNodes))
+    pre.append(code)
+    renderedBlocks.set(pre, { code, source, language })
+    return true
+  }
+
   const current = renderedBlocks.get(pre)
   const codeIsCurrent = current?.code === pre.firstElementChild &&
     current.source === source &&

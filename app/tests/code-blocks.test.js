@@ -195,6 +195,58 @@ test('tokenizeCode identifies every JSON role without changing visible text', ()
   assert.equal(tokens.find(token => token.type === 'number')?.text, '-1250')
 })
 
+test('non-JSON enhancement preserves existing code markup and bare child nodes', () => {
+  const documentRef = new TestDocument()
+  const root = documentRef.createElement('main')
+
+  const annotatedPre = documentRef.createElement('pre')
+  annotatedPre.dataset.language = 'python'
+  const existingCode = documentRef.createElement('code')
+  existingCode.className = 'language-python annotated-source'
+  existingCode.setAttribute('data-annotation', 'keep')
+  const strong = documentRef.createElement('strong')
+  strong.textContent = 'northstar'
+  const mark = documentRef.createElement('mark')
+  mark.textContent = 'approved'
+  existingCode.append(
+    documentRef.createTextNode('account = "'),
+    strong,
+    documentRef.createTextNode('"\nstatus = "'),
+    mark,
+    documentRef.createTextNode('"')
+  )
+  annotatedPre.append(existingCode)
+
+  const barePre = documentRef.createElement('pre')
+  barePre.dataset.language = 'python'
+  const bareText = documentRef.createTextNode('print(')
+  const bareMark = documentRef.createElement('mark')
+  bareMark.textContent = '"review"'
+  const bareClose = documentRef.createTextNode(')')
+  barePre.append(bareText, bareMark, bareClose)
+  root.append(annotatedPre, barePre)
+
+  assert.equal(enhanceCodeBlocks(root), 2)
+  assert.equal(annotatedPre.firstElementChild, existingCode)
+  assert.equal(existingCode.className, 'language-python annotated-source')
+  assert.equal(existingCode.attributes.get('data-annotation'), 'keep')
+  assert.equal(existingCode.children[0], strong)
+  assert.equal(existingCode.children[1], mark)
+  assert.equal(annotatedPre.textContent, 'account = "northstar"\nstatus = "approved"')
+
+  const wrappedCode = barePre.firstElementChild
+  assert.equal(wrappedCode.tagName, 'CODE')
+  assert.equal(wrappedCode.childNodes[0], bareText)
+  assert.equal(wrappedCode.childNodes[1], bareMark)
+  assert.equal(wrappedCode.childNodes[2], bareClose)
+  assert.equal(barePre.textContent, 'print("review")')
+
+  assert.equal(enhanceCodeBlocks(root), 0)
+  assert.equal(annotatedPre.firstElementChild, existingCode)
+  assert.equal(barePre.firstElementChild, wrappedCode)
+  assert.equal(root.querySelectorAll('.code-copy-button').length, 2)
+})
+
 test('highlighting keeps unsafe HTML literal, preserves clipboard text, and adds no elements from source', async () => {
   const documentRef = new TestDocument()
   const root = documentRef.createElement('main')
