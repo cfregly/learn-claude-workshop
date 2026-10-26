@@ -128,28 +128,31 @@ function renderCode(pre, source, language) {
     return true
   }
 
+  const existingCode = Array.from(pre.children).find(child => child.matches?.('code'))
   const current = renderedBlocks.get(pre)
-  const codeIsCurrent = current?.code === pre.firstElementChild &&
+  const codeIsCurrent = Boolean(current && current.code === existingCode &&
     current.source === source &&
     current.language === language &&
-    pre.textContent === source
+    pre.textContent === source)
   if (codeIsCurrent) return false
 
   const doc = pre.ownerDocument
-  const code = doc.createElement('code')
-  if (language === 'json') code.className = 'code-highlight language-json'
+  const code = existingCode || doc.createElement('code')
+  code.classList.add('code-highlight', 'language-json')
+  const children = []
   for (const token of tokenizeCode(source, language)) {
     const tokenClass = JSON_TOKEN_CLASSES[token.type]
     if (!tokenClass) {
-      code.append(doc.createTextNode(token.text))
+      children.push(doc.createTextNode(token.text))
       continue
     }
     const span = doc.createElement('span')
     span.className = `code-token ${tokenClass}`
     span.textContent = token.text
-    code.append(span)
+    children.push(span)
   }
-  pre.replaceChildren(code)
+  code.replaceChildren(...children)
+  if (pre.childNodes.length !== 1 || pre.firstElementChild !== code) pre.replaceChildren(code)
   renderedBlocks.set(pre, { code, source, language })
   return true
 }

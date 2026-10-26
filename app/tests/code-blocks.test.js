@@ -311,3 +311,51 @@ test('observer rehighlights dynamic JSON once without duplicate wrappers or butt
   assert.equal(pre.firstElementChild, updatedCode)
   assert.equal(pre.replaceCount, dynamicRenderCount)
 })
+
+test('observer preserves an external JSON code reference across updates and exact copy', async () => {
+  TestMutationObserver.instances = []
+  const documentRef = new TestDocument()
+  const root = documentRef.createElement('main')
+  const pre = documentRef.createElement('pre')
+  pre.dataset.language = 'json'
+  const code = documentRef.createElement('code')
+  code.className = 'receipt-output'
+  code.setAttribute('data-receipt-owner', 'native-integration')
+  code.textContent = '{"evidence_state":"prepared_unrun"}'
+  pre.append(code)
+  root.append(pre)
+
+  const observer = observeCodeBlocks(root)
+  assert.equal(pre.firstElementChild, code)
+  assert.equal(code.classList.contains('receipt-output'), true)
+  assert.equal(code.classList.contains('code-highlight'), true)
+  assert.equal(code.classList.contains('language-json'), true)
+  assert.equal(code.attributes.get('data-receipt-owner'), 'native-integration')
+
+  const nextSource = '{"evidence_state":"mcp_observed","trace_id":"native_trace_123"}'
+  const visible = formatCode(nextSource, 'json')
+  code.textContent = nextSource
+  observer.trigger([{ target: code, addedNodes: [] }])
+
+  assert.equal(pre.firstElementChild, code)
+  assert.equal(code.textContent, visible)
+  assert.equal(code.classList.contains('receipt-output'), true)
+  assert.equal(code.attributes.get('data-receipt-owner'), 'native-integration')
+  assert.ok(code.querySelectorAll('.code-token-key').some(node => node.textContent === '"evidence_state"'))
+  assert.equal(root.querySelectorAll('.code-block-wrap').length, 1)
+  assert.equal(root.querySelectorAll('.code-copy-button').length, 1)
+
+  const copied = []
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: { clipboard: { writeText: async value => copied.push(value) } }
+  })
+  try {
+    await root.querySelector('.code-copy-button').click()
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, 'navigator', descriptor)
+    else delete globalThis.navigator
+  }
+  assert.deepEqual(copied, [visible])
+})

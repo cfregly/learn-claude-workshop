@@ -1,0 +1,30 @@
+[Unit]
+Description=Flux Capacitor Northstar Learning
+After=network.target
+
+[Service]
+Type=simple
+User=learn-claude-workshop
+Group=learn-claude-workshop
+WorkingDirectory=/opt/learn-claude-workshop/current
+ExecStart=/usr/local/bin/node /opt/learn-claude-workshop/app/server.mjs
+Environment=HOST=127.0.0.1
+Environment=PORT=18120
+EnvironmentFile=/etc/learn-claude-workshop-release
+EnvironmentFile=-/etc/learn-claude-workshop-api.env
+StateDirectory=learn-claude-workshop-model
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=192M
+TasksMax=32
+CPUQuota=25%
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

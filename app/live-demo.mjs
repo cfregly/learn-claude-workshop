@@ -5,6 +5,18 @@ import path from 'node:path'
 
 import Anthropic from '@anthropic-ai/sdk'
 
+import {
+  createNativeIntegration,
+  NativeIntegrationError,
+  NATIVE_ACCOUNT_ID,
+  NATIVE_ACTOR_ID,
+  NATIVE_INTEGRATION_CONTRACT,
+  NATIVE_LIMITS,
+  NATIVE_MODEL,
+  NATIVE_ROLE_IDS,
+  NATIVE_SKILL_NAME,
+  NATIVE_TOOL_NAME
+} from './native-integration.mjs'
 import { paths as learningPaths } from './public/content.js'
 import {
   STREAMING_LAB_ROLES,
@@ -15,6 +27,7 @@ import {
 const API_URL = 'https://api.anthropic.com/v1/messages'
 const API_VERSION = '2026-10-21'
 const DEFAULT_BUDGET_FILE = '/var/lib/learn-claude-workshop-model/model-usage.json'
+const DEFAULT_NATIVE_RECEIPT_FILE = '/var/lib/learn-claude-workshop-model/native-skill/latest-run.json'
 const DIAGNOSTIC_PACKETS_FILE = new URL('./public/materials/diagnostic-reference-packets.json', import.meta.url)
 const DIAGNOSTIC_PACKETS_MAX_BYTES = 65_536
 const FALLBACK = {
@@ -75,7 +88,8 @@ const ROUTE_SUMMARIES = Object.freeze({
   approach: 'The approach route compares how the same workflow changes across audiences, activities, and evidence of learning.',
   together: 'The together route splits business and technical learners for a short activity, then rejoins them for teach-back and a readiness decision.',
   streaming: 'The streaming route focuses on typed events, partial output, terminal events, stop reasons, and safe failure handling.',
-  diagnose: 'The diagnose route follows one fixed synthetic packet across API transport, backend relay, browser, UI, and client tool boundaries. It uses observed evidence to find the first unconfirmed boundary before proposing a repair.'
+  diagnose: 'The diagnose route follows one fixed synthetic packet across API transport, backend relay, browser, UI, and client tool boundaries. It uses observed evidence to find the first unconfirmed boundary before proposing a repair.',
+  'native-integration': 'The optional native integration route checks availability without a provider call. A learner-triggered run performs one fixed read-only MCP lookup for the synthetic Northstar account, then invokes the exact reviewed renewal-brief Skill with native code execution. The server preserves actual receipts separately from prepared or unrun material. Only Engineer and Account Executive are supported presentation views. Other learner roles are never silently remapped.'
 })
 
 const STEP_SUMMARIES = Object.freeze([
@@ -137,6 +151,10 @@ export const WORKFLOW_LIMITS = Object.freeze({
   provider_calls: 2,
   max_output_tokens: 900,
   total_timeout_ms: 45_000
+})
+export const NATIVE_SERVICE_LIMITS = Object.freeze({
+  request_bytes: 2_048,
+  receipt_bytes: 262_144
 })
 
 const WORKFLOW_SOURCE_RECORDS = Object.freeze([
@@ -394,6 +412,14 @@ function validateWorkflowSelection(value) {
   return { roleId: value.role_id }
 }
 
+function validateNativeSelection(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const keys = Object.keys(value)
+  if (keys.length !== 1 || keys[0] !== 'role_id') return null
+  if (!NATIVE_ROLE_IDS.includes(value.role_id)) return null
+  return { roleId: value.role_id }
+}
+
 function validWorkflowToolInput(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const keys = Object.keys(value)
@@ -438,6 +464,7 @@ function validateAsk(value, diagnosticCatalog = null) {
   if (value.context.step !== undefined && (!Number.isInteger(value.context.step) || value.context.step < 0 || value.context.step > 4)) return null
   if (value.context.material_id !== undefined && !Object.hasOwn(MATERIAL_SUMMARIES, value.context.material_id)) return null
   if (value.context.route !== undefined && !Object.hasOwn(ROUTE_SUMMARIES, value.context.route)) return null
+  if (value.context.route === 'native-integration' && value.context.role_id === undefined) return null
   const hasDiagnosticContext = value.context.route === 'diagnose' || value.context.diagnostic_case !== undefined
   if (hasDiagnosticContext && (
     value.context.route !== 'diagnose' ||
@@ -559,6 +586,20 @@ function trustedStreamingContext(context) {
   ].filter(Boolean).join('\n')
 }
 
+function trustedNativeIntegrationContext(context) {
+  if (context.route !== 'native-integration') return null
+  const supported = NATIVE_ROLE_IDS.includes(context.role_id)
+  return [
+    'Trusted native MCP and Skill context:',
+    `This optional route is app controlled. It accepts only the exact Engineer and Account Executive role IDs for presentation. The selected role ${supported ? 'is supported directly' : 'is not supported and must not be remapped to another learner role'}.`,
+    `A learner-triggered run starts one local MCP STDIO session with the fixed synthetic actor demo-account-owner. The application checks access before one ${NATIVE_TOOL_NAME} read for ${NATIVE_ACCOUNT_ID}. The MCP server has no write or external network operation. This does not prove production employee authentication.`,
+    `The server creates or reuses the exact reviewed ${NATIVE_SKILL_NAME} bundle from source commit c74acd4, then makes one Messages request with the exact Skill pin and native code execution. The model is fixed to ${NATIVE_MODEL}, thinking is between_tools, the output ceiling is ${NATIVE_LIMITS.max_output_tokens} tokens, automatic retries are disabled, and the whole run is bounded to ${NATIVE_LIMITS.total_timeout_ms / 1_000} seconds.`,
+    'The native run shares the same persisted daily provider-call allowance, two-run concurrency limit, and four-second external-client cooldown as the other live routes. An upload or version request counts as one provider call. The Messages request counts as one provider call.',
+    'Completion requires the actual MCP receipt, exact Skill ID and version, native code-execution proof, canonical renderer-output hashes, current-run provider request IDs, message_stop, stop_reason end_turn, and human review. Prepared material, HTTP 200, a pin, or a visible brief alone is not completion.',
+    'This Ask request includes no current native brief, SSE event, trace ID, provider request ID, MCP receipt, Skill receipt, proof receipt, or completion state. Do not claim that a native run started or completed. Explain the contract unless the learner supplies separate observed evidence.'
+  ].join('\n')
+}
+
 function trustedDiagnosticContext(packet, artifact, includeReference) {
   if (!packet || !artifact) return null
   const sections = [
@@ -612,6 +653,8 @@ function trustedAskContext(context, includeReference, diagnosticPacket, diagnost
   if (context.route) sections.push(`Current route: ${ROUTE_SUMMARIES[context.route]}`)
   const streamingContext = trustedStreamingContext(context)
   if (streamingContext) sections.push(streamingContext)
+  const nativeIntegrationContext = trustedNativeIntegrationContext(context)
+  if (nativeIntegrationContext) sections.push(nativeIntegrationContext)
   const diagnosticContext = trustedDiagnosticContext(diagnosticPacket, diagnosticArtifact, includeReference)
   if (diagnosticContext) sections.push(diagnosticContext)
   return sections.join('\n\n')
@@ -761,6 +804,105 @@ function writeWorkflowEvent(response, event, data) {
   if (!isWritableResponse(response)) return false
   response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
   return true
+}
+
+function nativeProviderRequestIds(value) {
+  if (!Array.isArray(value) || value.length > NATIVE_LIMITS.max_provider_calls) return []
+  const result = []
+  for (const item of value) {
+    const id = textValue(item, 300)
+    if (!id || result.includes(id)) return []
+    result.push(id)
+  }
+  return result
+}
+
+function compactNativeProof(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const flags = [
+    'passed',
+    'skill_instruction_file_access_attempt_seen',
+    'skill_instruction_file_hash_matched',
+    'mounted_code_hash_matched',
+    'bundled_script_invocation_succeeded',
+    'marker_matched',
+    'deterministic_output_matched',
+    'source_record_validated',
+    'canonical_output_hash_matched'
+  ]
+  const proof = {}
+  for (const key of flags) {
+    if (typeof value[key] === 'boolean') proof[key] = value[key]
+  }
+  for (const key of ['expected_output_sha256', 'returned_output_sha256']) {
+    if (typeof value[key] === 'string' && /^[a-f0-9]{64}$/.test(value[key])) proof[key] = value[key]
+  }
+  return Object.keys(proof).length ? proof : null
+}
+
+function compactNativeProviderResponse(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const model = textValue(value.returned_model, 200) || textValue(value.model, 200)
+  const stopReason = textValue(value.stop_reason, 120)
+  const usage = safeUsage(value.usage)
+  const usageKnown = Object.keys(usage).length > 0
+  if (!model && !stopReason && !usageKnown) return null
+  return {
+    response_received: true,
+    model: model || null,
+    stop_reason: stopReason || null,
+    usage_known: usageKnown,
+    usage
+  }
+}
+
+function completedNativeProof(value) {
+  const proof = compactNativeProof(value)
+  if (!proof) return null
+  const required = [
+    'passed',
+    'skill_instruction_file_hash_matched',
+    'mounted_code_hash_matched',
+    'bundled_script_invocation_succeeded',
+    'marker_matched',
+    'deterministic_output_matched',
+    'source_record_validated',
+    'canonical_output_hash_matched'
+  ]
+  if (required.some(key => proof[key] !== true)) return null
+  if (!proof.expected_output_sha256 || proof.expected_output_sha256 !== proof.returned_output_sha256) return null
+  return proof
+}
+
+function nativeFailure(error, abortKind = null) {
+  if (abortKind === 'client_disconnected') {
+    return { code: 'client_disconnected', message: 'The browser disconnected. The incomplete native run was stopped without a retry.' }
+  }
+  if (abortKind === 'native_timeout' || error?.code === 'native_timeout') {
+    return { code: 'native_timeout', message: 'The native run reached its 45 second limit. Partial evidence remains incomplete.' }
+  }
+  const code = textValue(error?.code, 120) || 'native_integration_failed'
+  const messages = {
+    native_skill_busy: 'Another Skill pin update is already running. No provider call was added to a queue.',
+    runtime_dependencies_missing: 'The reviewed native runtime dependencies are unavailable.',
+    bundle_invalid: 'The reviewed Skill bundle did not pass inspection.',
+    bundle_drift: 'The reviewed Skill bundle changed after inspection. No retry was made.',
+    pin_invalid: 'The saved Skill pin is invalid. No provider lookup or delete fallback was attempted.',
+    pin_write_failed: 'The confirmed Skill pin could not be saved safely. The run is incomplete.',
+    skill_upload_invalid: 'The provider did not return a valid custom Skill pin. The run is incomplete.',
+    message_receipt_invalid: 'The Messages request did not return a usable request receipt. The run is incomplete.',
+    provider_access_denied: 'The current credential or workspace permission did not allow the native operation.',
+    provider_credit_required: 'The Anthropic account needs available API credit before this native run can complete.',
+    provider_rate_limited: 'Anthropic rate limited the native request. No retry was made.',
+    provider_outcome_unknown: 'A started provider request ended without a confirmed result. Its outcome remains unknown and no retry was made.',
+    native_proof_failed: 'The native Skill response did not satisfy the complete proof contract.',
+    native_terminal_invalid: 'The native response did not satisfy the server completion gate.',
+    client_disconnected: 'The browser disconnected. The incomplete native run was stopped without a retry.',
+    native_aborted: 'The native run was stopped. Partial evidence remains incomplete.',
+    provider_call_limit: 'The admitted provider-call plan changed before execution. No unreserved provider call was started.',
+    native_receipt_write_failed: 'The sanitized native run receipt could not be saved. Completion was withheld.'
+  }
+  return { code, message: messages[code] || 'The native integration failed without a retry. Partial evidence remains incomplete.' }
 }
 
 async function consumeWorkflowProviderStream(client, payload, options) {
@@ -914,14 +1056,21 @@ export function createLiveDemo(options = {}) {
   const apiKey = typeof env.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY.trim() : ''
   const model = typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL.trim() : ''
   const budgetFile = (typeof env.MODEL_BUDGET_FILE === 'string' && env.MODEL_BUDGET_FILE.trim()) || DEFAULT_BUDGET_FILE
+  const nativeReceiptFile = options.nativeReceiptFile || DEFAULT_NATIVE_RECEIPT_FILE
   const configured = Boolean(apiKey && model)
   const workflowTimeoutMs = options.workflowTimeoutMs ?? WORKFLOW_LIMITS.total_timeout_ms
+  const nativeTimeoutMs = Math.min(NATIVE_LIMITS.total_timeout_ms, Math.max(1, options.nativeTimeoutMs ?? NATIVE_LIMITS.total_timeout_ms))
   const anthropicClient = options.anthropicClient || (configured ? new Anthropic({
+    baseURL: 'https://api.anthropic.com',
     authToken: apiKey,
     maxRetries: 0,
     timeout: workflowTimeoutMs,
     defaultHeaders: { 'anthropic-version': API_VERSION }
   }) : null)
+  const nativeIntegration = options.nativeIntegration || createNativeIntegration({
+    ...(options.nativeOptions || {}),
+    timeoutMs: nativeTimeoutMs
+  })
   const clientCalls = new Map()
   let inFlight = 0
   let budgetQueue = Promise.resolve()
@@ -965,6 +1114,23 @@ export function createLiveDemo(options = {}) {
     } catch {
       await unlink(temporary).catch(() => {})
       throw new BudgetFileError('budget_write_failed')
+    }
+  }
+
+  async function writeNativeReceipt(record) {
+    const serialized = `${JSON.stringify(record)}\n`
+    if (Buffer.byteLength(serialized) > NATIVE_SERVICE_LIMITS.receipt_bytes) {
+      throw new NativeIntegrationError('native_receipt_write_failed', 'The sanitized native receipt exceeded its byte limit.', { stage: 'receipt' })
+    }
+    const directory = path.dirname(nativeReceiptFile)
+    const temporary = `${nativeReceiptFile}.${process.pid}.${uuid()}.tmp`
+    try {
+      await mkdir(directory, { recursive: true, mode: 0o750 })
+      await writeFile(temporary, serialized, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
+      await rename(temporary, nativeReceiptFile)
+    } catch (error) {
+      await unlink(temporary).catch(() => {})
+      throw new NativeIntegrationError('native_receipt_write_failed', 'The sanitized native receipt could not be saved.', { stage: 'receipt', cause: error })
     }
   }
 
@@ -1023,6 +1189,30 @@ export function createLiveDemo(options = {}) {
           : remainingCalls < WORKFLOW_LIMITS.provider_calls
             ? 'insufficient_remaining_calls'
             : 'ready'
+    let nativePlan = null
+    if (configured && model === NATIVE_MODEL) {
+      try {
+        nativePlan = await nativeIntegration.plan()
+      } catch {
+        nativePlan = null
+      }
+    }
+    const nativeCallsRequired = [1, 2].includes(nativePlan?.calls_required) ? nativePlan.calls_required : null
+    const nativeRuntimeReady = nativePlan?.enabled === true &&
+      typeof nativePlan.upload_required === 'boolean' &&
+      nativeCallsRequired !== null
+    const nativeReason = !configured
+      ? 'not_configured'
+      : model !== NATIVE_MODEL
+        ? 'model_not_allowed'
+        : !nativeRuntimeReady
+          ? (textValue(nativePlan?.reason, 120) || 'runtime_dependencies_missing')
+          : reason !== 'ready'
+            ? reason
+            : remainingCalls < nativeCallsRequired
+              ? 'insufficient_remaining_calls'
+              : 'ready'
+    const nativeEnabled = nativeRuntimeReady && nativeReason === 'ready'
     return {
       status: 'ok',
       available,
@@ -1070,6 +1260,26 @@ export function createLiveDemo(options = {}) {
           request_bytes: WORKFLOW_LIMITS.request_bytes,
           max_output_tokens_per_call: WORKFLOW_LIMITS.max_output_tokens,
           total_timeout_ms: workflowTimeoutMs
+        }
+      },
+      native_integration: {
+        enabled: nativeEnabled,
+        reason: nativeReason,
+        endpoint: NATIVE_INTEGRATION_CONTRACT.endpoint,
+        upload_required: nativeRuntimeReady ? nativePlan.upload_required : null,
+        calls_required: nativeCallsRequired,
+        role_ids: [...NATIVE_ROLE_IDS],
+        account_id: NATIVE_ACCOUNT_ID,
+        tool_name: NATIVE_TOOL_NAME,
+        skill_name: NATIVE_SKILL_NAME,
+        model: NATIVE_MODEL,
+        data_kind: 'synthetic',
+        review_required: true,
+        max_provider_calls: NATIVE_LIMITS.max_provider_calls,
+        limits: {
+          request_bytes: NATIVE_SERVICE_LIMITS.request_bytes,
+          max_output_tokens: NATIVE_LIMITS.max_output_tokens,
+          total_timeout_ms: nativeTimeoutMs
         }
       },
       fallback: FALLBACK
@@ -1474,6 +1684,324 @@ export function createLiveDemo(options = {}) {
     }
   }
 
+  async function handleNativeIntegration(request) {
+    const traceId = `native_${uuid()}`
+    if (request.method !== 'POST') {
+      return {
+        statusCode: 405,
+        headers: { Allow: 'POST' },
+        body: { status: 'error', code: 'method_not_allowed', message: 'Use POST to run the fixed native integration.', trace_id: traceId }
+      }
+    }
+
+    const parsed = await parsePostRequest(request, NATIVE_SERVICE_LIMITS.request_bytes, 'fixed native role selection')
+    if (parsed.result) return { ...parsed.result, body: { ...parsed.result.body, trace_id: traceId } }
+    const selection = validateNativeSelection(parsed.value)
+    if (!selection) {
+      return {
+        statusCode: 400,
+        body: { status: 'error', code: 'invalid_selection', message: 'Choose exactly the Engineer or Account Executive role ID. Account, actor, model, Skill, prompt, and tool inputs are fixed by the workshop.', trace_id: traceId }
+      }
+    }
+    if (!configured || !anthropicClient) {
+      return errorResult(503, 'live_demo_not_configured', 'The native integration is not configured. No provider call was made.', traceId)
+    }
+    if (model !== NATIVE_MODEL) {
+      return errorResult(503, 'model_not_allowed', 'The configured model is not the exact model allowlisted for this native integration.', traceId)
+    }
+
+    const timestamp = now()
+    const client = clientAddress(request)
+    const previousCall = clientCalls.get(client)
+    if (previousCall !== undefined && timestamp - previousCall < limits.cooldown_ms) {
+      return errorResult(429, 'client_cooldown', 'Please wait a few seconds before starting another live example.', traceId, 'unavailable', {
+        retry_after_ms: limits.cooldown_ms - (timestamp - previousCall)
+      })
+    }
+    if (inFlight >= limits.concurrent_calls) {
+      return errorResult(429, 'live_demo_busy', 'Two live examples are already running. Try again shortly.', traceId)
+    }
+
+    let executionPlan
+    try {
+      executionPlan = await nativeIntegration.plan()
+    } catch {
+      executionPlan = null
+    }
+    const callsRequired = [1, 2].includes(executionPlan?.calls_required) ? executionPlan.calls_required : null
+    if (executionPlan?.enabled !== true || typeof executionPlan.upload_required !== 'boolean' || callsRequired === null) {
+      const reason = textValue(executionPlan?.reason, 120) || 'runtime_dependencies_missing'
+      return errorResult(503, reason, nativeFailure({ code: reason }).message, traceId)
+    }
+
+    inFlight += 1
+    clientCalls.set(client, timestamp)
+    let reservation
+    try {
+      reservation = await reserveBudget(timestamp, callsRequired)
+    } catch {
+      inFlight -= 1
+      clientCalls.delete(client)
+      return errorResult(503, 'usage_budget_unavailable', 'The shared provider-call budget cannot be checked safely. No native run started.', traceId)
+    }
+    if (!reservation.allowed) {
+      inFlight -= 1
+      clientCalls.delete(client)
+      return errorResult(429, 'native_budget_insufficient', `Fewer than ${callsRequired} provider calls remain today. No native run started.`, traceId)
+    }
+
+    return {
+      statusCode: 200,
+      stream: true,
+      async start(response) {
+        const controller = new AbortController()
+        let providerCallsStarted = 0
+        let abortKind = null
+        let finished = false
+        let cleanedUp = false
+        const observed = { mcp: null, skill: null, native: null }
+
+        const onClose = () => {
+          if (finished) return
+          abortKind = 'client_disconnected'
+          controller.abort(new NativeIntegrationError('client_disconnected', 'The event consumer disconnected.', { stage: 'stream' }))
+        }
+        response.once('close', onClose)
+        request.once?.('aborted', onClose)
+        const timeout = setTimeout(() => {
+          if (finished) return
+          abortKind = 'native_timeout'
+          controller.abort(new NativeIntegrationError('native_timeout', 'The native integration reached its time limit.', { stage: 'run' }))
+        }, nativeTimeoutMs)
+        timeout.unref?.()
+
+        const requestDestroyedBeforeCompletion = request.destroyed && request.complete !== true
+        const alreadyDisconnected = request.aborted || request.readableAborted || requestDestroyedBeforeCompletion ||
+          request.socket?.destroyed || response.destroyed || response.closed || response.writableEnded ||
+          response.writableFinished || !response.writable || response.socket?.destroyed
+        if (alreadyDisconnected) onClose()
+
+        const emit = (event, data) => {
+          const written = writeWorkflowEvent(response, event, data)
+          if (!written && !finished) onClose()
+          return written
+        }
+        const evidenceState = () => observed.skill ? 'skill_pinned' : observed.mcp ? 'mcp_observed' : 'prepared_unrun'
+        const cleanup = async () => {
+          if (cleanedUp) return
+          cleanedUp = true
+          clearTimeout(timeout)
+          response.off('close', onClose)
+          request.off?.('aborted', onClose)
+          const unstartedCalls = Math.max(0, callsRequired - providerCallsStarted)
+          if (unstartedCalls > 0) await releaseBudget(reservation.token, unstartedCalls).catch(() => {})
+          inFlight -= 1
+          if (clientCalls.size > 1_000) {
+            const current = now()
+            for (const [key, value] of clientCalls) {
+              if (current - value >= limits.cooldown_ms) clientCalls.delete(key)
+            }
+          }
+          if (isWritableResponse(response)) response.end()
+        }
+        const receiptRecord = ({ status, providerRequestIds = [], proof = null, output = null, providerResponse = null, error = null }) => ({
+          schema_version: 1,
+          status,
+          trace_id: traceId,
+          role_id: selection.roleId,
+          account_id: NATIVE_ACCOUNT_ID,
+          actor_id: NATIVE_ACTOR_ID,
+          prepared: false,
+          review_required: true,
+          evidence_state: status === 'complete' ? 'native_skill_observed' : evidenceState(),
+          calls_reserved: callsRequired,
+          provider_calls_started: providerCallsStarted,
+          provider_request_ids: providerRequestIds,
+          mcp: observed.mcp,
+          skill: observed.skill,
+          native_execution: observed.native ? {
+            model: observed.native.model,
+            provider_request_id: observed.native.provider_request_id,
+            usage: safeUsage(observed.native.usage),
+            container_id: observed.native.container_id,
+            skill_id: observed.native.skill_id,
+            skill_version: observed.native.skill_version,
+            proof: compactNativeProof(observed.native.proof)
+          } : null,
+          proof,
+          output,
+          stop_reason: status === 'complete' ? 'end_turn' : null,
+          message_stop: status === 'complete',
+          retry_attempted: false,
+          fallback_attempted: false,
+          raw_response_persisted: false,
+          thinking_persisted: false,
+          ...(providerResponse ? { provider_response: providerResponse } : {}),
+          error,
+          persisted_at: new Date(now()).toISOString()
+        })
+
+        try {
+          if (controller.signal.aborted) throw controller.signal.reason
+          if (!emit('run_start', {
+            trace_id: traceId,
+            role_id: selection.roleId,
+            account_id: NATIVE_ACCOUNT_ID,
+            evidence_state: 'prepared_unrun',
+            upload_required: executionPlan.upload_required,
+            calls_required: callsRequired,
+            review_required: true
+          })) throw new NativeIntegrationError('client_disconnected', 'The event consumer disconnected.', { stage: 'run_start' })
+          if (!emit('status', { stage: 'mcp', message: 'Starting the fixed read-only Northstar MCP session.' })) {
+            throw new NativeIntegrationError('client_disconnected', 'The event consumer disconnected.', { stage: 'mcp' })
+          }
+
+          const result = await nativeIntegration.run({
+            roleId: selection.roleId,
+            traceId,
+            client: anthropicClient,
+            signal: controller.signal,
+            onProviderCallStart: async () => {
+              if (controller.signal.aborted) throw controller.signal.reason
+              if (providerCallsStarted >= callsRequired) {
+                throw new NativeIntegrationError('provider_call_limit', 'The admitted native provider-call limit was reached.', { stage: 'provider' })
+              }
+              providerCallsStarted += 1
+            },
+            emit: async (event, data) => {
+              if (!NATIVE_INTEGRATION_CONTRACT.core_events.includes(event)) {
+                throw new NativeIntegrationError('native_event_invalid', 'The native core emitted an unexpected event.', { stage: 'stream' })
+              }
+              if (!data || typeof data !== 'object' || Array.isArray(data) || data.trace_id !== traceId) {
+                throw new NativeIntegrationError('native_event_invalid', 'The native core emitted an invalid event payload.', { stage: 'stream' })
+              }
+              if (Buffer.byteLength(JSON.stringify(data)) > NATIVE_SERVICE_LIMITS.receipt_bytes) {
+                throw new NativeIntegrationError('native_event_invalid', 'The native core event exceeded its byte limit.', { stage: 'stream' })
+              }
+              if (event === 'mcp_observed') {
+                if (observed.mcp) throw new NativeIntegrationError('native_event_invalid', 'The native core repeated the MCP event.', { stage: 'stream' })
+                observed.mcp = data
+              } else if (event === 'skill_pinned') {
+                if (!observed.mcp || observed.skill) throw new NativeIntegrationError('native_event_invalid', 'The native core emitted the Skill pin out of order.', { stage: 'stream' })
+                observed.skill = data
+              } else {
+                if (!observed.skill || observed.native) throw new NativeIntegrationError('native_event_invalid', 'The native core emitted native proof out of order.', { stage: 'stream' })
+                observed.native = data
+              }
+              if (!emit(event, data)) throw new NativeIntegrationError('client_disconnected', 'The event consumer disconnected.', { stage: event })
+              return true
+            }
+          })
+
+          const providerRequestIds = nativeProviderRequestIds(result?.provider_request_ids)
+          const proof = completedNativeProof(result?.proof)
+          const validTerminal = result?.status === 'complete' &&
+            result?.trace_id === traceId &&
+            result?.role_id === selection.roleId &&
+            result?.account_id === NATIVE_ACCOUNT_ID &&
+            result?.evidence_state === 'native_skill_observed' &&
+            result?.review_required === true &&
+            result?.message_stop === true &&
+            result?.mcp_read === true &&
+            result?.native_skill_used === true &&
+            result?.proof_passed === true &&
+            result?.stop_reason === 'end_turn' &&
+            result?.model === NATIVE_MODEL &&
+            result?.message?.returned_model === NATIVE_MODEL &&
+            result?.message?.model_exact_match === true &&
+            result?.message?.stop_reason === 'end_turn' &&
+            result?.message?.thinking_response_persisted === false &&
+            Number.isSafeInteger(result?.message?.final_text_char_count) && result.message.final_text_char_count > 0 &&
+            result?.skill_access_proof?.passed === true &&
+            providerCallsStarted === callsRequired &&
+            result?.provider_calls_started === callsRequired &&
+            providerRequestIds.length === callsRequired &&
+            observed.mcp && observed.skill && observed.native &&
+            observed.native.stop_reason === 'end_turn' &&
+            observed.native.model === NATIVE_MODEL &&
+            observed.native.provider_request_id === providerRequestIds.at(-1) &&
+            observed.native.skill_id === observed.skill.skill_id &&
+            observed.native.skill_version === observed.skill.version &&
+            proof &&
+            JSON.stringify(observed.native.proof) === JSON.stringify(proof) &&
+            JSON.stringify(observed.native.output) === JSON.stringify(result.output)
+          if (!validTerminal) {
+            throw new NativeIntegrationError('native_terminal_invalid', 'The native response did not satisfy the server completion gate.', { stage: 'complete', receipt: result })
+          }
+
+          const complete = {
+            trace_id: traceId,
+            evidence_state: 'native_skill_observed',
+            review_required: true,
+            stop_reason: 'end_turn',
+            message_stop: true,
+            model: NATIVE_MODEL,
+            mcp: observed.mcp,
+            skill: observed.skill,
+            proof,
+            output: result.output,
+            provider_request_ids: providerRequestIds,
+            usage: safeUsage(result.usage)
+          }
+          await writeNativeReceipt(receiptRecord({
+            status: 'complete',
+            providerRequestIds,
+            proof,
+            output: result.output
+          }))
+          finished = true
+          emit('complete', complete)
+        } catch (error) {
+          const failure = nativeFailure(error, abortKind)
+          const errorReceipt = error?.receipt && typeof error.receipt === 'object' ? error.receipt : null
+          const providerRequestIds = nativeProviderRequestIds(errorReceipt?.provider_request_ids)
+          const rawPartialProof = errorReceipt?.proof?.skill_access_proof || errorReceipt?.skill_access_proof || errorReceipt?.proof
+          const proof = compactNativeProof(rawPartialProof)
+          const providerResponse = compactNativeProviderResponse(errorReceipt?.message || errorReceipt?.proof?.response)
+          const errorData = {
+            code: failure.code,
+            message: failure.message,
+            failed_stage: textValue(error?.stage, 120) || 'run'
+          }
+          try {
+            await writeNativeReceipt(receiptRecord({
+              status: 'error',
+              providerRequestIds,
+              proof,
+              output: null,
+              providerResponse,
+              error: errorData
+            }))
+          } catch (receiptError) {
+            const receiptFailure = nativeFailure(receiptError)
+            errorData.code = receiptFailure.code
+            errorData.message = receiptFailure.message
+            errorData.failed_stage = 'receipt'
+          }
+          if (isWritableResponse(response)) {
+            emit('error', {
+              code: errorData.code,
+              message: errorData.message,
+              trace_id: traceId,
+              evidence_state: evidenceState(),
+              failed_stage: errorData.failed_stage,
+              partial: true,
+              review_required: true,
+              provider_request_ids: providerRequestIds,
+              ...(observed.mcp ? { mcp: observed.mcp } : {}),
+              ...(observed.skill ? { skill: observed.skill } : {}),
+              ...(proof ? { proof } : {}),
+              ...(providerResponse ? { provider_response: providerResponse } : {})
+            })
+          }
+          finished = true
+        } finally {
+          await cleanup()
+        }
+      }
+    }
+  }
+
   async function parsePostRequest(request, maximumBytes, description) {
     if (String(request.headers['sec-fetch-site'] || '').toLowerCase() === 'cross-site' || !sameOrigin(request)) {
       return {
@@ -1571,5 +2099,5 @@ export function createLiveDemo(options = {}) {
     return run(request, { kind: 'ask', ask })
   }
 
-  return { capabilities, handle, handleAsk, handleWorkflow }
+  return { capabilities, handle, handleAsk, handleWorkflow, handleNativeIntegration }
 }

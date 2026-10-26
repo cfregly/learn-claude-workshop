@@ -7,9 +7,13 @@ import { initAskClaude } from './ask-claude.js?v=20261025-rename'
 import { observeCodeBlocks } from './code-blocks.js?v=20261025-rename'
 import { mountStreamingLab } from './streaming-lab.js?v=20261025-rename'
 import { mountLiveWorkflow } from './live-workflow.js?v=20261026-review-fixes'
+import { mountNativeIntegration } from './native-integration.js?v=20261026-resource'
 const githubRef = '75ba253996e7da32a9a7bdbfd3096d575b0bc3fe'
+const nativeIntegrationRef = 'c74acd400dbb05243116993ada98f23349616549'
 const githubRoot = 'https://github.com/cfregly/learn-claude-workshop'
 const githubFile = path => `${githubRoot}/blob/${githubRef}/${path}`
+const nativeGuideUrl = `${githubRoot}/blob/${nativeIntegrationRef}/docs/skills-tools-example.md`
+const nativeBundleUrl = `${githubRoot}/tree/${nativeIntegrationRef}/labs/skills/renewal-brief`
 
 const main = document.querySelector('#main')
 const steps = ['Your task', 'How it works', 'Demonstration', 'Business value & practice', 'Learning check']
@@ -33,6 +37,7 @@ let toastTimeout
 let diagnosticLabHandle
 let streamingLabHandle
 let liveWorkflowHandle
+let nativeIntegrationHandle
 let activeStreamingMode = 'replay'
 let activeLessonDemoMode = 'prepared'
 let workflowSelection = []
@@ -333,15 +338,17 @@ function materialLink(file) {
     'diagnostics-lab.js':['diagnose','labs/diagnostics/diagnostics-lab.js'],
     'hooks-lab.md':['hooks-lab','docs/hooks-lab.md'],
     'live-stream-tool-demo.md':['live-stream-tool','docs/live-stream-tool-demo.md'],
-    'live-stream-tool-demo.py':['live-stream-tool-code','labs/live-stream-tool-demo.py']
+    'live-stream-tool-demo.py':['live-stream-tool-code','labs/live-stream-tool-demo.py'],
+    'skills-tools-example.md':['native-integration','docs/skills-tools-example.md',nativeIntegrationRef]
   }
-  const [slug,path] = links[file]
-  return {slug,url:file.endsWith('.zip')?`${githubRoot}/tree/${githubRef}/${path}`:githubFile(path)}
+  const [slug,path,ref=githubRef] = links[file]
+  return {slug,url:file.endsWith('.zip')?`${githubRoot}/tree/${ref}/${path}`:`${githubRoot}/blob/${ref}/${path}`}
 }
 function materials() {
   document.title = 'Workshop materials | Flux Capacitor'
   const items = [
     ['Live streaming tool workflow','Run one fixed read-only Northstar lookup, inspect named SSE events, and hold the final draft for human review.','live-stream-tool-demo.md','Read the guide'],
+    ['Native MCP and Skill integration','Optional live path. The application reads fixed Northstar context through MCP, then Claude runs the exact pinned Skill. Runtime receipts stay separate from the prepared guide.','skills-tools-example.md','Open the native integration'],
     ['Before and after an account action','Optional: distinguish application access checks, before-tool hooks, after-action records, and service notifications.','hooks-lab.md','Read the extension'],
     ['Diagnose a stalled draft','Follow evidence from Claude to the screen. Choose the next check, test a display repair, and compare with a completed reference.','diagnostics-lab.js','Open the diagnosis lab'],
     ['Extend the renewal workflow','Optional role-based activities on citations, schemas, caching, memory, Skills, advisor, programmatic tool calling, and token counting.','supporting-features.md','Read the extensions'],
@@ -360,10 +367,27 @@ function materials() {
   items.sort((a,b)=>Number(b[2]==='diagnostics-lab.js')-Number(a[2]==='diagnostics-lab.js'))
   if(state.facilitator)items.push(['Diagnosis instructor key','Expected boundaries, checks, repairs, verification, changed cases, and a scoring rubric.','diagnostic-instructor-guide.md','Read the instructor key'])
   const core=new Set(['northstar-source-pack.md','api-trace.ipynb','claude_api_demo.py','streaming-lab.md','diagnostics-lab.js','live-stream-tool-demo.md'])
-  const extensions=new Set(['claude-for-work.md','northstar-renewals.zip','thinking-lab.md','supporting-features.md','hooks-lab.md'])
+  const extensions=new Set(['claude-for-work.md','northstar-renewals.zip','thinking-lab.md','supporting-features.md','hooks-lab.md','skills-tools-example.md'])
   const groups=[['core','Core workflow',items.filter(item=>core.has(item[2]))],['references','References',items.filter(item=>!core.has(item[2])&&!extensions.has(item[2]))],['extensions','Optional paths and extensions',items.filter(item=>extensions.has(item[2]))]]
-  const card=([title,description,file])=>{const m=materialLink(file);const href=m.slug==='diagnose'?'#diagnose':m.slug==='streaming-lab'?'#streaming':'#material/'+m.slug;const label=m.slug==='diagnose'?'Open the diagnosis lab':m.slug==='streaming-lab'?'Open the event lab':'Read here';return `<section class="material"><h3>${esc(title)}</h3><p>${esc(description)}</p><div class="actions"><a class="button secondary" href="${href}" aria-label="${esc(label+': '+title)}">${label}</a><a class="button quiet" href="${m.url}" target="_blank" rel="noopener noreferrer" aria-label="${esc('Open '+title+' in GitHub')}">Open in GitHub &#8599;</a></div></section>`}
+  const card=([title,description,file])=>{const m=materialLink(file);const href=m.slug==='diagnose'?'#diagnose':m.slug==='streaming-lab'?'#streaming':m.slug==='native-integration'?'#resources/native-integration':'#material/'+m.slug;const label=m.slug==='diagnose'?'Open the diagnosis lab':m.slug==='streaming-lab'?'Open the event lab':m.slug==='native-integration'?'Open the native integration':'Read here';return `<section class="material"><h3>${esc(title)}</h3><p>${esc(description)}</p><div class="actions"><a class="button secondary" href="${href}" aria-label="${esc(label+': '+title)}">${label}</a><a class="button quiet" href="${m.url}" target="_blank" rel="noopener noreferrer" aria-label="${esc('Open '+title+' in GitHub')}">Open in GitHub &#8599;</a></div></section>`}
   main.innerHTML=`<div class="page"><a class="back-link" href="${state.lastLesson||'#paths'}">${state.lastLesson?'&#8592; Back to your lesson':'&#8592; Choose a learning path'}</a><div class="resource-header"><h1>The working materials.</h1><p class="lead">Use the core workflow first. Keep references and optional extensions nearby.</p><a class="button secondary" href="#path/software-engineer-api/2">Open the shared API demo</a></div><nav class="materials-index actions" aria-label="Material groups">${groups.map(([id,title])=>`<button class="button quiet small" data-action="jump-materials" data-section="materials-${id}" aria-controls="materials-${id}">${title}</button>`).join('')}</nav>${groups.map(([id,title,entries])=>`<section class="materials-group" id="materials-${id}"><h2>${title}</h2><div class="materials">${entries.map(card).join('')}</div></section>`).join('')}<section class="spaced-lg"><h2>Your learning record</h2><p>Export your drafts, saved attempts, learning checks, and group questions.</p><button class="button secondary" data-action="export-progress">Export my progress</button></section><p class="small muted spaced">Northstar is fictional. Prepared references and simulations work without an API key. Optional live calls use fixed synthetic records.</p></div>`
+}
+
+function nativeIntegrationPage() {
+  document.title = 'Native MCP and Skill integration | Flux Capacitor'
+  const path = paths.find(item => item.id === state.lastPath)
+  const supported = path && ['software-engineer-api','account-executive'].includes(path.id)
+  const goal = path
+    ? learningGoal(path)
+    : '<p class="lesson-outcome"><strong>Your goal</strong> Choose a supported learning path before running this optional integration.</p>'
+  const unavailable = !supported ? `<section class="notice"><strong>No native run is available for this selected view.</strong> ${path?`Your ${esc(roleName(path))} goal remains selected. `:''}The optional native panel supports only the Software engineer and Account Executive paths, so no capability or provider request starts here.</section><div class="actions"><a class="button secondary" href="#path/software-engineer-api/0">Select the Software engineer path</a><a class="button secondary" href="#path/account-executive/0">Select the Account Executive path</a></div><div class="actions live-workflow-resources"><a class="button quiet" href="${nativeGuideUrl}" target="_blank" rel="noopener noreferrer">Read the pinned guide &#8599;</a><a class="button quiet" href="${nativeBundleUrl}" target="_blank" rel="noopener noreferrer">Inspect the full Skill bundle &#8599;</a></div>` : '<div id="native-integration"></div>'
+  main.innerHTML = `<div class="page"><a class="back-link" href="#resources">&#8592; Back to Materials</a><h1>Native MCP and Skill integration</h1>${goal}<p class="lead">The application reads fixed Northstar context through its local, read-only MCP server. Claude then runs the exact pinned Skill in native code execution. The prepared guide explains the design. This page shows a receipt only after this runtime observes the evidence.</p>${unavailable}</div>`
+  if (!supported) return
+  nativeIntegrationHandle = mountNativeIntegration(document.querySelector('#native-integration'), {
+    roleId: path.id,
+    guideHref: nativeGuideUrl,
+    sourceHref: nativeBundleUrl
+  })
 }
 
 function adaptMaterial(path, slug) {
@@ -431,6 +455,7 @@ function render() {
   diagnosticLabHandle?.destroy();diagnosticLabHandle=null
   streamingLabHandle?.destroy();streamingLabHandle=null
   liveWorkflowHandle?.destroy();liveWorkflowHandle=null
+  nativeIntegrationHandle?.destroy();nativeIntegrationHandle=null
   activeLessonDemoMode='prepared'
   main.removeAttribute('aria-busy')
   const hash=location.hash.slice(1)
@@ -440,10 +465,11 @@ function render() {
   else if(hash==='approach') teachingApproach()
   else if(hash==='streaming'||hash.startsWith('streaming/')) streamingLab()
   else if(hash==='diagnose') diagnosticsLab()
+  else if(hash==='resources/native-integration') nativeIntegrationPage()
   else if(hash.startsWith('material/')) {const slug=hash.split('/')[1];renderMaterial(main,slug,{githubRef,backHref:state.lastLesson||'#resources'}).then(()=>{const path=paths.find(p=>p.id===state.lastPath);if(path&&location.hash.slice(1)===hash){main.querySelector('h1')?.insertAdjacentHTML('afterend',learningGoal(path));adaptMaterial(path,slug)}})}
   else if(hash==='resources') {materials();document.querySelector('.page').insertAdjacentHTML('beforeend',conceptHelp())}
   else home(hash==='paths')
-  document.querySelectorAll('.site-header nav a').forEach(anchor=>{const href=anchor.getAttribute('href');const selected=href==='#together'?hash==='together':href==='#resources'?hash==='resources'||hash.startsWith('material/'):!(hash==='together'||hash==='resources'||hash.startsWith('material/'));if(selected)anchor.setAttribute('aria-current','page');else anchor.removeAttribute('aria-current')})
+  document.querySelectorAll('.site-header nav a').forEach(anchor=>{const href=anchor.getAttribute('href');const selected=href==='#together'?hash==='together':href==='#resources'?hash==='resources'||hash.startsWith('resources/')||hash.startsWith('material/'):!(hash==='together'||hash==='resources'||hash.startsWith('resources/')||hash.startsWith('material/'));if(selected)anchor.setAttribute('aria-current','page');else anchor.removeAttribute('aria-current')})
   document.querySelector('#facilitator-mode').checked=Boolean(state.facilitator)
   updateTimer()
 }
@@ -557,6 +583,7 @@ const questionGuide = initAskClaude({getContext() {
   if(kind==='material') return {context:{material_id:id==='source-pack'?'source':id,...(path?{role_id:path.id}:{})},label:`${path?roleName(path)+" · ":""}${id.replaceAll('-',' ')}`,suggestions:['Explain the main idea in this material','Walk me through one example','How does this apply to my role?']}
   if(kind==='streaming'){const s=state.streaming||{};const scenario=s.scenarioId||'happy';const role=s.roleId||'engineer';if(activeStreamingMode==='live'){const audience=role==='sales'?'account-executive':role==='product'?'product-manager':'software-engineer-api';const label=role==='sales'?'Account Executive':role==='product'?'Product':'Engineer';return {context:{route:'streaming',role_id:audience,stream_mode:'live'},label:label+' · Live Northstar workflow',suggestions:['Explain this live workflow','Which trace fields prove the lookup completed?','What should I check if streaming stops?']}}const audience=role==='sales'?(state.lastPath==='account-executive'?'account-executive':'sales-manager'):role==='product'?'product-manager':path?.category==='Technical'?path.id:'software-engineer-api';const label=role==='sales'&&audience==='account-executive'?'Account Executive':role[0].toUpperCase()+role.slice(1);return {context:{route:'streaming',role_id:audience,stream_scenario:scenario,stream_step:s.stepByScenario?.[scenario]||0,stream_role:role},label:label+' · '+scenario+' · step '+((s.stepByScenario?.[scenario]||0)+1),suggestions:['Explain the current event','What evidence permits the next application stage?','What would change if this stream stopped now?']}}
   if(kind==='together')return {context:{route:'together',role_id:activeRoute==='engineer'?'software-engineer-api':path&&path.category!=='Technical'?path.id:'account-executive'},label:'Shared activity · '+(activeRoute==='engineer'?'Engineering route':'Business route'),suggestions:['What evidence should I bring to the checkpoint?','Give me a hint without solving the activity','What does the other route need to understand?']}
+  if(kind==='resources'&&id==='native-integration'){const technical=path?.id==='software-engineer-api';return {context:{route:'native-integration',...(path?{role_id:path.id}:{})},label:`${path?roleName(path)+' · ':''}Native MCP and Skill`,suggestions:technical?['Explain the native evidence sequence','How is a Skill pin different from observed execution?','Which terminal fields permit review?']:['Which brief sections require source IDs?','How should unknowns remain visible?','What evidence is required before review?']}}
   if(kind==='resources')return {context:{route:'resources',...(path?{role_id:path.id}:{})},label:'Materials and learning record',suggestions:['Which reference helps me continue my activity?','How do I export my saved work?','Which examples run without an API key?']}
   return {context:{route:'home'},label:'Choose your learning path',suggestions:['Which path fits my learning need?','Explain the shared workflow','How would this work in my organization?']}
 }})

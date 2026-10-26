@@ -1,0 +1,24 @@
+[Unit]
+Description=Watch Learn Claude Workshop backend source files
+
+[Path]
+PathChanged=/opt/learn-claude-workshop/app/server.mjs
+PathChanged=/opt/learn-claude-workshop/app/live-demo.mjs
+PathChanged=/opt/learn-claude-workshop/app/native-integration.mjs
+PathChanged=/opt/learn-claude-workshop/app/native-integration-proof.py
+PathChanged=/opt/learn-claude-workshop/app/public/content.js
+PathChanged=/opt/learn-claude-workshop/app/public/materials/diagnostic-reference-packets.json
+PathChanged=/opt/learn-claude-workshop/app/public/materials/source-fixtures.json
+PathChanged=/opt/learn-claude-workshop/labs/source-fixtures.json
+PathChanged=/opt/learn-claude-workshop/labs/mcp/renewal-review/server.py
+PathChanged=/opt/learn-claude-workshop/labs/skills/renewal-brief/SKILL.md
+PathChanged=/opt/learn-claude-workshop/labs/skills/renewal-brief/references/OUTPUT_CONTRACT.md
+PathChanged=/opt/learn-claude-workshop/labs/skills/renewal-brief/scripts/contract.py
+PathChanged=/opt/learn-claude-workshop/labs/skills/renewal-brief/scripts/render_brief.py
+PathChanged=/opt/learn-claude-workshop/labs/skills/renewal-brief/renewal_skill/bundle.py
+PathChanged=/opt/learn-claude-workshop/labs/skills/renewal-brief/renewal_skill/evidence.py
+PathChanged=/opt/learn-claude-workshop/labs/skills/renewal-brief/renewal_skill/io.py
+Unit=learn-claude-workshop-reload.service
+
+[Install]
+WantedBy=multi-user.target

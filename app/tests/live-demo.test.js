@@ -150,7 +150,7 @@ test('reports live capability without revealing a credential and keeps health ac
   assert.ok(capability.ask.material_ids.includes('thinking-lab'))
   assert.ok(capability.ask.material_ids.includes('model-capabilities'))
   assert.ok(capability.ask.material_ids.includes('diagnostic-instructor-guide'))
-  assert.deepEqual(capability.ask.routes, ['home', 'resources', 'approach', 'together', 'streaming', 'diagnose'])
+  assert.deepEqual(capability.ask.routes, ['home', 'resources', 'approach', 'together', 'streaming', 'diagnose', 'native-integration'])
   assert.deepEqual(capability.ask.diagnostic_case_ids, [
     'healthy_text_renewal',
     'pings_only_no_progress',
