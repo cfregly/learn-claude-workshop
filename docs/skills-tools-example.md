@@ -15,7 +15,7 @@ Status on October 26, 2026: the local MCP smoke and offline tests have run. The 
 | Bundled renderer | Build and self-check the fixture-format brief inside the Skill container. | The script packaged with the Skill |
 | Local evidence checker | Compare returned tool results, mounted-file hashes, and output with the local pin and expected result. | [evidence.py](../labs/skills/renewal-brief/renewal_skill/evidence.py) |
 
-These are complementary layers. A tool can run a script, and a Skill can instruct Claude to use a tool. MCP supplies a common interface for capabilities. The application or service enforces access. None of those labels grants a real employee permission to read customer records.
+These are complementary layers. A tool can run a script, and a Skill can instruct Claude to use a tool. MCP supplies a common interface for capabilities. Skill instructions, tool schemas, and MCP tool definitions do not grant data access. Remote MCP also supports [transport-level authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization). The server must validate credentials and enforce policy for the requested data.
 
 ## Start locally
 
@@ -23,7 +23,7 @@ Follow the [MCP lab](../labs/mcp/renewal-review/README.md) first. Its local smok
 
 Then follow the [Skill lab](../labs/skills/renewal-brief/README.md). Its offline checks validate the bundle and output contract without provider calls. Upload and model execution require separate explicit opt-in, an approved environment, and the real pin returned by the service.
 
-The operator exports the MCP smoke result to a file and passes that file to the Skill runner. The runner treats it as caller-supplied data. It cannot tell whether it came from MCP. The model does not select or call MCP in this flow.
+The operator exports the MCP smoke result to a file and passes that file to the Skill runner. The runner treats it as caller-supplied data. It cannot verify whether it came from MCP or whether its contents are fictional. Its synthetic marker records the caller's declaration. The model does not select or call MCP in this flow.
 
 ## What to check
 
@@ -41,6 +41,8 @@ This is a small protocol exercise. A script alone produces this particular brief
 ## Choose by the requirement
 
 Use a script for a fixed computation or check. Expose an operation as a tool when Claude needs to request it. Use a Skill to package procedure, examples, and supporting resources for Claude. Use MCP when compatible hosts need a common capability interface. An existing API can remain behind the tool, and a script can be part of the Skill. These are design choices for the task, rather than mutually exclusive replacements. The [official sources](source-and-attribution.md) define the interfaces.
+
+Native Skills also support [progressive disclosure](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview#how-skills-work). Name and description appear first. Claude accesses instructions and supporting files when needed. This explains a benefit of packaging procedure as a Skill without treating it as a replacement for an API.
 
 ## A learning question
 
