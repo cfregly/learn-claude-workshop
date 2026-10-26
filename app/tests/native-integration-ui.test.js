@@ -255,7 +255,7 @@ test('availability makes no provider request and an Engineer can complete the up
   const sourceLink = findNode(host, item => item.textContent === 'Inspect the full Skill bundle')
   assert.equal(guideLink.href, '#material/native-guide')
   assert.equal(sourceLink.href, 'https://github.com/example/source')
-  assert.equal(sourceLink.target, '_blank')
+  assert.notEqual(sourceLink.target, '_blank')
 
   runButton.click()
   await settle()

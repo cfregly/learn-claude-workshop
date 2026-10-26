@@ -456,14 +456,12 @@ export function mountNativeIntegration(host, {
   const safeGuideHref = safeHref(guideHref, '#material/native-integration')
   guideLink.href = safeGuideHref
   if (safeGuideHref.startsWith('https://')) {
-    guideLink.target = '_blank'
     guideLink.rel = 'noopener noreferrer'
   }
   const sourceLink = node(documentRef, 'a', 'Inspect the full Skill bundle', 'button quiet')
   const safeSourceHref = safeHref(sourceHref, '#material/native-integration-code')
   sourceLink.href = safeSourceHref
   if (safeSourceHref.startsWith('https://')) {
-    sourceLink.target = '_blank'
     sourceLink.rel = 'noopener noreferrer'
   }
   resources.append(guideLink, sourceLink)
@@ -678,7 +676,7 @@ export function mountNativeIntegration(host, {
         plan.uploadRequired = false
         plan.callsRequired = 1
         if (skill.provider_request_id) state.providerRequestIds.push(skill.provider_request_id)
-        setStage('skill', `Pinned ${skill.skill_id} at ${skill.version}. Native execution is not yet observed.`, 'observed')
+        setStage('skill', `Pinned ${skill.skill_id} at ${skill.version}.`, 'observed')
         runStatus.textContent = 'Skill pin observed. Waiting for native execution proof.'
         renderReceipt(state)
         return
