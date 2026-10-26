@@ -251,6 +251,7 @@ function revealReference(documentRef, container, packet, profile, backHref) {
   referenceField(documentRef, list, 'Expected reference result', packet.expected_reference_result)
   referenceField(documentRef, list, 'Recovery', packet.recovery)
   referenceField(documentRef, list, 'Verification', packet.verification)
+  if(packet.id==='duplicated_cumulative_snapshots')referenceField(documentRef,list,'Match the replay to the repair','For cumulative snapshots, replace Ren with Renewal. For incremental deltas, append Ren then ewal. Both contracts should end at Renewal once.')
   container.append(list)
   heading(documentRef, container, 5, 'Exact rejoin point')
   paragraph(documentRef, container, profile.rejoin)
