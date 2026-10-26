@@ -57,9 +57,9 @@ reason for the change and not a churn prediction.
 3. Review the draft against the records.
 4. Use the reviewed output in the existing process.
 
-## Output contract
+## Example output contract: brief and email
 
-Produce five sections:
+Follow the artifact requirements in your selected learning path. For an exercise that asks for a brief and follow-up email, produce these five sections:
 
 1. Confirmed facts with a source label after each item.
 2. Synthesis labeled as synthesis.

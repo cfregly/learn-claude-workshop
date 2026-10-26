@@ -37,7 +37,7 @@ ACCOUNT_ACCESS = {
 SYNTHETIC_SOURCE_STORE = {
     "northstar-freight": [
         "[CRM] Northstar Freight renews on January 31, 2027. Maya Chen is the account owner.",
-        "[CALL, October 14] Devon Price asked whether SSO is available. The supplied records contain no entitlement answer. A 12 percent discount was discussed but not approved.",
+        "[CALL, October 14] Devon Price asked whether SSO is available. The supplied records contain no entitlement answer. A 12 percent discount was discussed. Approval is not recorded.",
         "[SUPPORT CASE 4821] Delayed shipment-alert emails remain open.",
         "[USAGE] Weekly active users are 64, down from 78 in the prior period.",
     ]

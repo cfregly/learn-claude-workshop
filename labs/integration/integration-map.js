@@ -22,7 +22,7 @@ const envelope = {
               'Prepare the reviewed Northstar renewal brief.',
               '',
               '[CRM] Northstar Freight renews on January 31, 2027. Maya Chen is the account owner.',
-              '[CALL] SSO entitlement is unknown. A 12 percent discount was discussed but not approved.',
+              '[CALL] SSO entitlement is unknown. A 12 percent discount was discussed. Approval is not recorded.',
               '[SUPPORT CASE 4821] Delayed shipment-alert emails remain open.',
               '[USAGE] Weekly active users are 64, down from 78 in the prior period.'
             ].join('\n')
@@ -131,7 +131,7 @@ const steps = [
       ['Source pack', '#material/source-pack'],
       ['Failure lab', '#diagnose']
     ],
-    failure: 'The unapproved discount or unknown SSO entitlement becomes a fact, or response completion is treated as an Account Executive decision.',
+    failure: 'Unknown discount approval or SSO entitlement is presented as confirmed, or response completion is treated as an Account Executive decision.',
     check: 'Verify required fields and sources, keep unsupported claims unknown, and name the owner and next action for every gap.',
     expected: 'Maya Chen or the designated Account Executive either approves the source-checked draft for planning or holds it with a named next step.'
   }

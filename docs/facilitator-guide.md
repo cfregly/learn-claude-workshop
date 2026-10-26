@@ -41,11 +41,11 @@ Trace the saved notebook request and response. Locate the application account-ac
 
 ### Account Executive route
 
-Compare the draft brief with the source notes. Mark which customer claims are supported and reject the unapproved discount. Choose the next customer question.
+Compare the draft brief with the source notes. Mark which customer claims are supported and remove any claim that the discount is approved. Choose the next customer question.
 
 ### Rejoin checkpoint
 
-At four minutes, one engineer explains one integration step. One Account Executive explains one customer conclusion and its evidence. The unapproved discount anchors both explanations.
+At four minutes, one engineer explains one integration step. One Account Executive explains one customer conclusion and its evidence. Unknown discount approval anchors both explanations.
 
 Use the responses to decide whether to continue or revisit a missing concept.
 

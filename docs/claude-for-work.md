@@ -112,7 +112,7 @@ as completed.
 Check the draft against the four files before using it.
 
 - The renewal date, contract value, owner, case status, and usage values match their sources.
-- The 12 percent discount remains discussed and unapproved.
+- The 12 percent discount was discussed. Approval is not recorded.
 - SSO entitlement and the security follow-up owner remain unknown.
 - The usage change is not described as a cause or churn prediction.
 - Proposed actions are labeled and no external action is described as complete.
@@ -169,7 +169,7 @@ Bring back three things:
 2. One unknown that must stay visible.
 3. One condition that must be met before the business can act.
 
-Compare answers across roles. Everyone should be able to explain why the 12 percent discount remains unapproved and where human review occurs.
+Compare answers across roles. Everyone should be able to explain why approval for the 12 percent discount remains unknown and where human review occurs.
 
 ## Official Anthropic references
 
