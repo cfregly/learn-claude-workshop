@@ -10,6 +10,8 @@ Teach one custody boundary at a time. A network read is only a byte chunk. Keep 
 
 Use the same loop for every packet: evidence, plausible causes, one discriminating check, supported repair, verification through the visible path, then one changed case. Spend one minute on the last confirmed boundary, two on causes, two on the check, two on repair, two on verification, and one on transfer.
 
+When a learner starts a fresh independent attempt, preserve the prior answers in the learning record and clear only the active workspace. Keep the packet evidence visible. Reveal guidance and the completed reference only after the learner commits one next check. The [curated replay source](../labs/diagnostics/diagnostics-lab.js) implements this boundary.
+
 Keep identities separate. Correlate the application trace, attempt, provider message ID, content block, `tool_use.id`, and business operation key. Never substitute one for another. A ping proves connection activity, not reasoning progress. HTTP 200 can precede a streamed error. EOF without the required terminal event is an interruption. `message_stop` closes the protocol message. It does not prove a correct business result.
 
 Role prompts:

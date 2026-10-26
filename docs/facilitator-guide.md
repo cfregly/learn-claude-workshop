@@ -33,6 +33,8 @@ Do not add product or API depth until the room can identify the common path.
 
 Announce both routes and the rejoin time before the activity begins. Learners may choose the route that matches their learning need.
 
+Both routes inspect the [same prepared API draft](../labs/integration/shared-integration.js). The Engineer traces the [integration boundaries](../labs/integration/integration-map.js). The Account Executive reviews the same customer claims and decides whether the draft is ready for account planning. Claude for Work is an optional alternate exercise.
+
 ### Engineer route
 
 Trace the saved notebook request and response. Locate the application account-access check that runs before Northstar facts enter the request. If time remains, use the prepared extension to identify the terminal stream state.

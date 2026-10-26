@@ -1,3 +1,4 @@
+// Exact public teaching fields used by the workshop backend.
 export const paths = [
   {
     "id": "account-executive",
@@ -5,7 +6,7 @@ export const paths = [
     "category": "Business",
     "task": "Prepare a source-linked Northstar renewal brief for Maya Chen before the customer call.",
     "outcome": "The learner can trace the brief to approved sources, distinguish fact, synthesis, unknown, and unsupported claim, explain one permission boundary, and choose a safe next action.",
-    "explanation": "Learners arrange six cards: request, permission check, retrieval, Claude, review, and proposed CRM update. The application controls which records are available. Claude drafts from the selected records. The Account Executive reviews the draft before using it, and no CRM write occurs in the exercise. A polished sentence is not proof.",
+    "explanation": "The application checks which Northstar records the employee may read. Its server holds the Claude API credential and sends only approved records.\n\nYou review the resulting draft against those records. Separate supported facts, interpretation, unknowns, and unsupported claims. A finished response does not approve pricing or entitlement.\n\nThe engineer inspects the same integration and its failures. Your evidence is a source-checked brief and a safe next action. Claude for Work is available as an alternate exercise.",
     "exercise": {
       "reference": "FACT AND SOURCE: Renewal January 31, 2027 and owner Maya Chen [CRM]. Case 4821 is open [SUPPORT]. Weekly active users changed from 78 to 64 [USAGE]. SYNTHESIS: The support issue and lower use may matter, with no evidence of cause or churn. UNKNOWN: SSO entitlement and security owner. UNSUPPORTED CLAIM REMOVED: The 12 percent discount is approved. NEXT CUSTOMER QUESTION: Who owns the security follow-up? SAFE NEXT ACTION: Maya confirms package and pricing details internally before using the brief."
     }
@@ -131,4 +132,4 @@ export const paths = [
       "reference": "BASELINE DECISION: Allow in the offline pilot after caller and account checks because it contains only the approved synthetic CRM, support, and usage fields. SENSITIVE VARIANT DECISION: Stop before the API call because member_id SYN-4471 is not needed for the renewal brief and no regulated-data arrangement is evidenced. NETWORKING: Customer firewall permits the documented direct API destination. Permission remains a separate application and workspace check. SECURITY: A scoped service identity may invoke the API, while customer code authorizes the employee, account, records, and tools. COMPUTE: Anthropic runs model inference. Customer runs the backend, record filter, queue, and review workflow. STORAGE: Anthropic operates model artifacts. Customer stores application data and deployment state. Request handling follows the verified model, feature, and organization arrangement. OBSERVABILITY: Customer logs app_trace_id, request_id, workspace_id, source version, status, tokens, and latency. Correlation exists only when the backend propagates those identifiers. RELIABILITY: Timeout is 30 seconds, transient retries are capped at two, 401 and 403 are not retried, and any interrupted output stays visibly incomplete. INFRASTRUCTURE AS CODE: Version the lab policy, learner role, workspace selection, and cleanup steps. Remove synthetic data and revoke temporary access after the lab. COST: Use interactive Messages for the user-waiting path. Consider an asynchronous pattern only for an approved offline workload after reviewing current retention and feature eligibility. RELEASE CONDITION: Security and legal owners document the accepted data fields, signed agreement where required, enabled organization state, feature eligibility, region settings, and logging policy."
     }
   }
-];
+]

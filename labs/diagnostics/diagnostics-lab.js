@@ -42,6 +42,28 @@ const CASE_LABELS = Object.freeze({
   tool_write_confirmed_final_stream_lost: 'Write confirmed'
 })
 
+const INDEPENDENT_CASE_LABELS = Object.freeze({
+  healthy_text_renewal: 'Text path',
+  pings_only_no_progress: 'Connection signals',
+  backend_delta_browser_gap: 'Browser stays empty',
+  browser_delta_ui_filter: 'Screen stays empty',
+  duplicated_cumulative_snapshots: 'Repeated text',
+  sse_error_after_http_200: 'Partial response',
+  partial_tool_json_max_tokens: 'Tool input stops',
+  tool_write_confirmed_final_stream_lost: 'Final explanation missing'
+})
+
+const INDEPENDENT_TITLES = Object.freeze({
+  healthy_text_renewal: 'Text arrives in two pieces',
+  pings_only_no_progress: 'Only connection signals appear',
+  backend_delta_browser_gap: 'The application has text and the browser does not',
+  browser_delta_ui_filter: 'The browser has text and the screen stays blank',
+  duplicated_cumulative_snapshots: 'The screen shows RenRenewal',
+  sse_error_after_http_200: 'HTTP 200 is followed by a stream error',
+  partial_tool_json_max_tokens: 'Tool input stops before completion',
+  tool_write_confirmed_final_stream_lost: 'The account change is recorded and the final explanation is missing'
+})
+
 const PLAIN_EXPLANATIONS = Object.freeze({
   healthy_text_renewal: 'Treat streaming as a custody chain. Each component must preserve event order, content, and terminal evidence.',
   pings_only_no_progress: 'Connection activity and answer progress are different signals. A heartbeat carries no answer content.',
@@ -105,13 +127,55 @@ function normalizeRevealed(value) {
   return Object.fromEntries(Object.entries(value).filter(([, revealed]) => revealed === true))
 }
 
+function normalizeCommittedChecks(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([caseId, check]) => [caseId, stringValue(check).trim()])
+      .filter(([, check]) => check)
+  )
+}
+
+function copyAnswers(answers) {
+  return Object.fromEntries(
+    Object.entries(answers).map(([caseId, answer]) => [caseId, { ...answer }])
+  )
+}
+
+function flatAttempt(state) {
+  return {
+    attemptId: state.attemptId,
+    mode: state.mode,
+    caseId: state.caseId,
+    answers: copyAnswers(state.answers),
+    revealed: { ...state.revealed },
+    committedChecks: { ...state.committedChecks }
+  }
+}
+
+function normalizePriorAttempts(value) {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter(attempt => attempt && typeof attempt === 'object' && !Array.isArray(attempt))
+    .map((attempt, index) => ({
+      attemptId: stringValue(attempt.attemptId) || `archived-${index + 1}`,
+      mode: attempt.mode === 'independent' ? 'independent' : 'worked',
+      caseId: stringValue(attempt.caseId) || DEFAULT_CASE,
+      answers: normalizeAnswers(attempt.answers),
+      revealed: normalizeRevealed(attempt.revealed),
+      committedChecks: normalizeCommittedChecks(attempt.committedChecks)
+    }))
+}
+
 function snapshot(state) {
   return {
     caseId: state.caseId,
-    answers: Object.fromEntries(
-      Object.entries(state.answers).map(([caseId, answer]) => [caseId, { ...answer }])
-    ),
-    revealed: { ...state.revealed }
+    answers: copyAnswers(state.answers),
+    revealed: { ...state.revealed },
+    attemptId: state.attemptId,
+    priorAttempts: state.priorAttempts.map(attempt => flatAttempt(attempt)),
+    mode: state.mode,
+    committedChecks: { ...state.committedChecks }
   }
 }
 
@@ -262,7 +326,7 @@ function revealReference(documentRef, container, packet, profile, backHref) {
   }))
 }
 
-function renderLearningCheck(documentRef, parent, packet, profile, state, emitChange) {
+function renderLearningCheck(documentRef, parent, packet, profile, state, emitChange, onCommit) {
   const section = node(documentRef, 'section')
   heading(documentRef, section, 4, 'Learning check')
   paragraph(documentRef, section, profile.check)
@@ -297,35 +361,63 @@ function renderLearningCheck(documentRef, parent, packet, profile, state, emitCh
     onInput: value => update('repairAndVerification', value)
   })
   section.append(form)
+
+  if (state.mode === 'independent') {
+    const committed = stringValue(state.committedChecks[packet.id])
+    if (committed) {
+      paragraph(documentRef, section, `Committed next check: ${committed}`, 'notice')
+    } else {
+      paragraph(
+        documentRef,
+        section,
+        'Need a starting point? Name one observed handoff, then write what you would inspect next and which two causes that result would separate. A short check is enough to continue.',
+        'small muted'
+      )
+      const actions = node(documentRef, 'div', { className: 'actions' })
+      const status = node(documentRef, 'p', { className: 'small', attributes: { role: 'status' } })
+      const commit = node(documentRef, 'button', {
+        className: 'button secondary',
+        text: 'Commit my next check',
+        attributes: { type: 'button' }
+      })
+      commit.addEventListener('click', () => {
+        const check = stringValue(state.answers[packet.id].discriminatingCheck).trim()
+        if (!check) {
+          status.textContent = 'Add one short discriminating check above, then commit it.'
+          return
+        }
+        state.committedChecks[packet.id] = check
+        emitChange()
+        onCommit()
+      })
+      actions.append(commit)
+      section.append(actions, status)
+    }
+  }
   parent.append(section)
 }
 
-function renderCase(documentRef, host, packet, profile, state, emitChange, backHref) {
-  host.replaceChildren()
-  const article = node(documentRef, 'article', { className: 'diagnostic-case' })
-  heading(documentRef, article, 3, packet.title)
-  paragraph(documentRef, article, 'Prepared synthetic evidence packet.', 'small muted')
+function renderExplanation(documentRef, parent, packet, profile) {
+  const section = node(documentRef, 'section')
+  heading(documentRef, section, 4, 'Plain explanation')
+  paragraph(
+    documentRef,
+    section,
+    profile.label === 'Business'
+      ? 'A draft arriving and an account action completing are separate observations. Match each claim to the evidence you have.'
+      : PLAIN_EXPLANATIONS[packet.id] || 'Follow adjacent evidence boundaries and preserve unknowns.'
+  )
+  parent.append(section)
+}
 
-  const task = node(documentRef, 'section')
-  heading(documentRef, task, 4, 'Task')
-  paragraph(documentRef, task, profile.label==='Business'?'Use these signals to decide what the account team can say. Name what remains unconfirmed and who should check it.':packet.learner_prompt)
-  article.append(task)
+function renderValue(documentRef, parent, packet) {
+  const section = node(documentRef, 'section')
+  heading(documentRef, section, 4, 'Business value')
+  paragraph(documentRef, section, BUSINESS_VALUES[packet.id] || 'A precise boundary keeps the customer-facing state truthful.')
+  parent.append(section)
+}
 
-  const explanation = node(documentRef, 'section')
-  heading(documentRef, explanation, 4, 'Plain explanation')
-  paragraph(documentRef, explanation, profile.label==='Business'?'A draft arriving and an account action completing are separate observations. Match each claim to the evidence you have.':PLAIN_EXPLANATIONS[packet.id] || 'Follow adjacent evidence boundaries and preserve unknowns.')
-  article.append(explanation)
-
-  if(profile.label==='Business')businessEvidence(documentRef,article,packet)
-  else {renderEvidence(documentRef, article, packet);renderDisplayRepair(documentRef, article, packet)}
-
-  const value = node(documentRef, 'section')
-  heading(documentRef, value, 4, 'Business value')
-  paragraph(documentRef, value, BUSINESS_VALUES[packet.id] || 'A precise boundary keeps the customer-facing state truthful.')
-  article.append(value)
-
-  renderLearningCheck(documentRef, article, packet, profile, state, emitChange)
-
+function renderReferenceSection(documentRef, parent, packet, profile, state, emitChange, backHref) {
   const reference = node(documentRef, 'section', { className: 'reference' })
   heading(documentRef, reference, 4, 'Completed reference and rejoin')
   paragraph(documentRef, reference, 'Reveal this after writing your learning-check response.', 'small muted')
@@ -352,14 +444,87 @@ function renderCase(documentRef, host, packet, profile, state, emitChange, backH
   }
   reveal.addEventListener('click', () => showReference(true))
   reference.append(reveal, referenceBody)
-  article.append(reference)
+  parent.append(reference)
   if (state.revealed[packet.id] === true) showReference(false)
+}
 
+function renderChangedCase(documentRef, parent, packet, independent) {
   if (stringValue(packet.optional_changed_case)) {
-    const changed = node(documentRef, 'section')
-    heading(documentRef, changed, 4, 'Changed case')
-    paragraph(documentRef, changed, packet.optional_changed_case)
-    article.append(changed)
+    if (independent) {
+      const changed = node(documentRef, 'details', { className: 'reference' })
+      changed.append(node(documentRef, 'summary', { text: 'Try an optional changed case' }))
+      paragraph(documentRef, changed, packet.optional_changed_case)
+      parent.append(changed)
+    } else {
+      const changed = node(documentRef, 'section')
+      heading(documentRef, changed, 4, 'Changed case')
+      paragraph(documentRef, changed, packet.optional_changed_case)
+      parent.append(changed)
+    }
+  }
+}
+
+function renderCase(documentRef, host, packet, profile, state, emitChange, backHref) {
+  host.replaceChildren()
+  const independent = state.mode === 'independent'
+  const committed = Boolean(stringValue(state.committedChecks[packet.id]))
+  const article = node(documentRef, 'article', { className: 'diagnostic-case' })
+  heading(documentRef, article, 3, independent ? INDEPENDENT_TITLES[packet.id] || 'Diagnostic symptom' : packet.title)
+  paragraph(
+    documentRef,
+    article,
+    independent ? 'Independent attempt using prepared synthetic evidence.' : 'Worked example using prepared synthetic evidence.',
+    'small muted'
+  )
+
+  const task = node(documentRef, 'section')
+  heading(documentRef, task, 4, 'Task')
+  paragraph(
+    documentRef,
+    task,
+    profile.label === 'Business'
+      ? 'Use these signals to decide what the account team can say. Name what remains unconfirmed and who should check it.'
+      : packet.learner_prompt
+  )
+  article.append(task)
+
+  if (independent) {
+    if (profile.label === 'Business') businessEvidence(documentRef, article, packet)
+    else renderEvidence(documentRef, article, packet)
+    renderLearningCheck(
+      documentRef,
+      article,
+      packet,
+      profile,
+      state,
+      emitChange,
+      () => renderCase(documentRef, host, packet, profile, state, emitChange, backHref)
+    )
+    if (!committed) {
+      paragraph(
+        documentRef,
+        article,
+        'Commit one next check to open the explanation, repair practice, completed reference, and optional changed case.',
+        'notice'
+      )
+    } else {
+      renderExplanation(documentRef, article, packet, profile)
+      if (profile.label !== 'Business') renderDisplayRepair(documentRef, article, packet)
+      renderValue(documentRef, article, packet)
+      renderReferenceSection(documentRef, article, packet, profile, state, emitChange, backHref)
+      renderChangedCase(documentRef, article, packet, true)
+    }
+  } else {
+    renderExplanation(documentRef, article, packet, profile)
+    if (profile.label === 'Business') businessEvidence(documentRef, article, packet)
+    else {
+      renderEvidence(documentRef, article, packet)
+      renderDisplayRepair(documentRef, article, packet)
+    }
+    renderValue(documentRef, article, packet)
+    renderLearningCheck(documentRef, article, packet, profile, state, emitChange, () => {})
+    renderReferenceSection(documentRef, article, packet, profile, state, emitChange, backHref)
+    renderChangedCase(documentRef, article, packet, false)
   }
   host.append(article)
 }
@@ -375,7 +540,9 @@ function renderChooser(documentRef, parent, packets, state, onSelect) {
   const buttons = new Map()
   for (const packet of packets) {
     const button = node(documentRef, 'button', {
-      text: CASE_LABELS[packet.id] || packet.title,
+      text: state.mode === 'independent'
+        ? INDEPENDENT_CASE_LABELS[packet.id] || 'Diagnostic symptom'
+        : CASE_LABELS[packet.id] || packet.title,
       attributes: { type: 'button', 'aria-pressed': packet.id === state.caseId ? 'true' : 'false' }
     })
     button.addEventListener('click', () => {
@@ -405,10 +572,16 @@ export function mountDiagnosticsLab(host, {
   const profileId = Object.prototype.hasOwnProperty.call(PERSONAS, persona) ? persona : 'engineer'
   const profile = PERSONAS[profileId]
   const returnHref = typeof backHref === 'string' && backHref.startsWith('#') ? backHref : '#together'
+  const priorAttempts = normalizePriorAttempts(saved && saved.priorAttempts)
+  const mode = saved && saved.mode === 'independent' ? 'independent' : 'worked'
   const state = {
     caseId: stringValue(saved && saved.caseId) || DEFAULT_CASE,
     answers: normalizeAnswers(saved && saved.answers),
-    revealed: normalizeRevealed(saved && saved.revealed)
+    revealed: normalizeRevealed(saved && saved.revealed),
+    attemptId: stringValue(saved && saved.attemptId) || (mode === 'worked' ? 'worked-example' : `independent-${priorAttempts.length + 1}`),
+    priorAttempts,
+    mode,
+    committedChecks: normalizeCommittedChecks(saved && saved.committedChecks)
   }
   let active = true
   const controller = typeof AbortController === 'function' ? new AbortController() : null
@@ -454,28 +627,68 @@ export function mountDiagnosticsLab(host, {
     const packets = payload.packets
     if (!packets.some(packet => packet.id === state.caseId)) state.caseId = DEFAULT_CASE
     status.textContent = ''
-    content.replaceChildren()
-    content.append(node(documentRef, 'p', {
-      className: 'notice',
-      text: 'Eight synthetic cases. Times, IDs, results, and failures are teaching examples, not API measurements.'
-    }))
-    const caseHost = node(documentRef, 'div')
-    const select = packet => {
-      state.caseId = packet.id
-      renderCase(documentRef, caseHost, packet, profile, state, emitChange, returnHref)
-      emitChange()
+    const renderWorkspace = () => {
+      content.replaceChildren()
+      content.append(node(documentRef, 'p', {
+        className: 'notice',
+        text: 'Eight synthetic cases. Times, IDs, results, and failures are teaching examples, not API measurements.'
+      }))
+
+      const attempt = node(documentRef, 'section', { className: 'spaced' })
+      heading(documentRef, attempt, 3, state.mode === 'worked' ? 'Worked examples' : 'Independent attempt')
+      paragraph(
+        documentRef,
+        attempt,
+        state.mode === 'worked'
+          ? 'Guidance and completed references are available. Start fresh when you want to diagnose from evidence before seeing them.'
+          : 'Evidence stays visible. Guidance opens after you commit one next check.'
+      )
+      const count = state.priorAttempts.length
+      paragraph(
+        documentRef,
+        attempt,
+        `${count} prior ${count === 1 ? 'attempt' : 'attempts'} saved in your learning record.`,
+        'small muted'
+      )
+      const actions = node(documentRef, 'div', { className: 'actions' })
+      const fresh = node(documentRef, 'button', {
+        className: 'button secondary',
+        text: 'Start fresh attempt',
+        attributes: { type: 'button' }
+      })
+      fresh.addEventListener('click', () => {
+        state.priorAttempts.push(flatAttempt(state))
+        state.attemptId = `independent-${state.priorAttempts.length}`
+        state.mode = 'independent'
+        state.answers = {}
+        state.revealed = {}
+        state.committedChecks = {}
+        emitChange()
+        renderWorkspace()
+      })
+      actions.append(fresh)
+      attempt.append(actions)
+      content.append(attempt)
+
+      const caseHost = node(documentRef, 'div')
+      const select = packet => {
+        state.caseId = packet.id
+        renderCase(documentRef, caseHost, packet, profile, state, emitChange, returnHref)
+        emitChange()
+      }
+      renderChooser(documentRef, content, packets, state, select)
+      content.append(caseHost)
+      renderCase(
+        documentRef,
+        caseHost,
+        packets.find(packet => packet.id === state.caseId) || packets[0],
+        profile,
+        state,
+        emitChange,
+        returnHref
+      )
     }
-    renderChooser(documentRef, content, packets, state, select)
-    content.append(caseHost)
-    renderCase(
-      documentRef,
-      caseHost,
-      packets.find(packet => packet.id === state.caseId) || packets[0],
-      profile,
-      state,
-      emitChange,
-      returnHref
-    )
+    renderWorkspace()
   }
 
   const loadPackets = () => {
