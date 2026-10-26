@@ -1,5 +1,6 @@
 const REPO = 'https://github.com/cfregly/learn-claude-workshop'
 const NATIVE_REF = 'c74acd400dbb05243116993ada98f23349616549'
+const NATIVE_GUIDE_REF = '50dc8a10728ec3f1df33200ce60ced8494429c5d'
 const renders = new WeakMap()
 let readerSession = null
 
@@ -7,7 +8,7 @@ const materials = {
   'native-integration': {
     title: 'MCP context and a runnable Skill',
     description: 'Read the prepared guide alongside the live integration. Keep source records, Skill instructions, and runtime receipts distinct.',
-    local: '/materials/skills-tools-example.md', github: 'docs/skills-tools-example.md', githubRef: NATIVE_REF, kind: 'markdown'
+    local: '/materials/skills-tools-example.md', github: 'docs/skills-tools-example.md', githubRef: NATIVE_GUIDE_REF, kind: 'markdown'
   },
   'native-integration-code': {
     title: 'Renewal brief Skill bundle',

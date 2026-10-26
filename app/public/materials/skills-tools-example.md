@@ -2,8 +2,6 @@
 
 Use one fictional Northstar Freight task to see what each layer does. The goal is a source-bound renewal brief, with unresolved approvals left unresolved.
 
-Status on October 26, 2026: the local MCP smoke and offline tests have run. The native Skill bundle has not been uploaded or invoked through the Messages API. The request path is configured. The response checker is tested against authored response fixtures. Integration into the running workshop is separate work.
-
 ## The components
 
 | Component | Its job | Where to inspect it |
@@ -21,9 +19,15 @@ These are complementary layers. A tool can run a script, and a Skill can instruc
 
 Follow the [MCP lab](../labs/mcp/renewal-review/README.md) first. Its local smoke needs no model credentials. It starts a real stdio server, discovers the lookup, exercises the permitted path and denials, and can export the permitted synthetic record.
 
-Then follow the [Skill lab](../labs/skills/renewal-brief/README.md). Its offline checks validate the bundle and output contract without provider calls. Upload and model execution require separate explicit opt-in, an approved environment, and the real pin returned by the service.
+Then follow the [Skill lab](../labs/skills/renewal-brief/README.md). Its offline checks validate the bundle and output contract without provider calls. In this standalone flow, upload and model execution require separate explicit opt-in, an approved environment, and the real pin returned by the service.
 
-The operator exports the MCP smoke result to a file and passes that file to the Skill runner. The runner treats it as caller-supplied data. It cannot verify whether it came from MCP or whether its contents are fictional. Its synthetic marker records the caller's declaration. The model does not select or call MCP in this flow.
+In the standalone CLI flow, the operator exports the MCP smoke result to a file and passes that file to the Skill runner. The runner treats it as caller-supplied data. It cannot verify whether it came from MCP or whether its contents are fictional. Its synthetic marker records the caller's declaration. The model does not select or call MCP in this flow.
+
+## Observed in-app run
+
+One successful synthetic in-app native Skill run has been observed. The application completed the read-only MCP lookup before the first model request. The model did not select or call MCP. The run reused the exact previously created Skill pin. An earlier attempt uploaded that Skill but did not complete the full proof. The successful run did not upload the bundle or create a new version.
+
+The instruction hash, mounted code, bundled script, and canonical output checks all passed. The model finished with `end_turn`. Human review was still required. The run did not write to CRM or grant customer approval. Inspect the [published in-app runner source](https://github.com/cfregly/learn-claude-workshop/blob/41e970f5eb25c83f84d22f1819b34c721910b876/app/native-integration.mjs) and the [published UI stage copy correction](https://github.com/cfregly/learn-claude-workshop/blob/c4e5c8fb22a69edc3394fb25ff2043aacb69e9d4/app/public/native-integration.js).
 
 ## What to check
 
@@ -34,9 +38,9 @@ The operator exports the MCP smoke result to a file and passes that file to the 
 - Execution evidence comes from service tool results and the bundled script, rather than model narration alone.
 - The final brief preserves the missing discount approval and SSO entitlement.
 
-The bundled records are synthetic. Local protocol checks, native Skill execution, output validation, and running-app integration each produce evidence when run. As of this revision, only local MCP behavior and offline checks have been observed. Use the lab receipts to identify what a particular run established.
+The bundled records are synthetic. The standalone MCP smoke, offline checks, opt-in standalone Skill CLI, and in-app native Skill path are separate flows. Evidence from one does not prove another. Use each flow's output to identify what ran.
 
-This is a small protocol exercise. A script alone produces this particular brief. Its parser supports the supplied fixture formats and fails closed on an approval section. The proposed native Skill run demonstrates packaging and use inside Claude, rather than establishing that a model is necessary for this task. Test a changed source format before extending the parser to another workflow.
+This is a small protocol exercise. A script alone produces this particular brief. Its parser supports the supplied fixture formats and fails closed on an approval section. The native example exists to demonstrate packaging and use inside Claude, not to establish that a model is necessary for this task. Test a changed source format before extending the parser to another workflow.
 
 ## Choose by the requirement
 
