@@ -104,6 +104,27 @@ function paragraph(documentRef, parent, text, className = '') {
   parent.append(node(documentRef, 'p', { text, className }))
 }
 
+function persistenceParagraph(documentRef, parent, savedText, sessionText, available) {
+  const message = node(documentRef, 'p', {
+    attributes: { 'data-diagnostic-persistence': 'true' }
+  })
+  message.dataset.savedText = savedText
+  message.dataset.sessionText = sessionText
+  updatePersistenceMessage(message, available)
+  parent.append(message)
+}
+
+function updatePersistenceMessage(message, available) {
+  message.textContent = available ? message.dataset.savedText : message.dataset.sessionText
+  message.className = available ? 'small muted' : 'notice'
+}
+
+function updatePersistenceMessages(root, available) {
+  for (const message of root.querySelectorAll('[data-diagnostic-persistence]')) {
+    updatePersistenceMessage(message, available)
+  }
+}
+
 function stringValue(value) {
   return typeof value === 'string' ? value : ''
 }
@@ -317,6 +338,7 @@ function revealReference(documentRef, container, packet, profile, backHref) {
   referenceField(documentRef, list, 'Verification', packet.verification)
   if(packet.id==='duplicated_cumulative_snapshots')referenceField(documentRef,list,'Match the replay to the repair','For cumulative snapshots, replace Ren with Renewal. For incremental deltas, append Ren then ewal. Both contracts should end at Renewal once.')
   container.append(list)
+  if (packet.optional_changed_case_reference) referenceField(documentRef, list, 'Changed-case reference', packet.optional_changed_case_reference)
   heading(documentRef, container, 5, 'Exact rejoin point')
   paragraph(documentRef, container, profile.rejoin)
   container.append(node(documentRef, 'a', {
@@ -330,7 +352,13 @@ function renderLearningCheck(documentRef, parent, packet, profile, state, emitCh
   const section = node(documentRef, 'section')
   heading(documentRef, section, 4, 'Learning check')
   paragraph(documentRef, section, profile.check)
-  paragraph(documentRef, section, 'Use your own words. The lab saves responses for review and does not grade them automatically.', 'small muted')
+  persistenceParagraph(
+    documentRef,
+    section,
+    'Use your own words. Responses are saved in this browser for review and are not graded automatically.',
+    'Use your own words. Responses stay only for this session. Export your learning record from Materials before leaving. They are not graded automatically.',
+    state.storageAvailable
+  )
   const form = node(documentRef, 'div', { className: 'diagnostic-form' })
   const answer = state.answers[packet.id] || {
     lastConfirmedBoundary: '',
@@ -562,7 +590,8 @@ export function mountDiagnosticsLab(host, {
   persona = 'engineer',
   saved = {},
   onChange = () => {},
-  backHref = '#together'
+  backHref = '#together',
+  storageAvailable = true
 } = {}) {
   if (!host || typeof host.replaceChildren !== 'function') {
     throw new TypeError('mountDiagnosticsLab requires a DOM host element.')
@@ -581,7 +610,8 @@ export function mountDiagnosticsLab(host, {
     attemptId: stringValue(saved && saved.attemptId) || (mode === 'worked' ? 'worked-example' : `independent-${priorAttempts.length + 1}`),
     priorAttempts,
     mode,
-    committedChecks: normalizeCommittedChecks(saved && saved.committedChecks)
+    committedChecks: normalizeCommittedChecks(saved && saved.committedChecks),
+    storageAvailable: storageAvailable !== false
   }
   let active = true
   const controller = typeof AbortController === 'function' ? new AbortController() : null
@@ -598,7 +628,10 @@ export function mountDiagnosticsLab(host, {
   host.append(status, content)
 
   const emitChange = () => {
-    if (typeof onChange === 'function') onChange(snapshot(state))
+    const result = typeof onChange === 'function' ? onChange(snapshot(state)) : undefined
+    if (typeof result === 'boolean') state.storageAvailable = result
+    updatePersistenceMessages(host, state.storageAvailable)
+    return state.storageAvailable
   }
 
   const showError = error => {
@@ -644,11 +677,12 @@ export function mountDiagnosticsLab(host, {
           : 'Evidence stays visible. Guidance opens after you commit one next check.'
       )
       const count = state.priorAttempts.length
-      paragraph(
+      persistenceParagraph(
         documentRef,
         attempt,
         `${count} prior ${count === 1 ? 'attempt' : 'attempts'} saved in your learning record.`,
-        'small muted'
+        `${count} prior ${count === 1 ? 'attempt is' : 'attempts are'} kept only for this session. Export your learning record from Materials before leaving.`,
+        state.storageAvailable
       )
       const actions = node(documentRef, 'div', { className: 'actions' })
       const fresh = node(documentRef, 'button', {

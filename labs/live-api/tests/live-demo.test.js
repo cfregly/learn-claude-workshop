@@ -150,7 +150,7 @@ test('reports live capability without revealing a credential and keeps health ac
   assert.ok(capability.ask.material_ids.includes('thinking-lab'))
   assert.ok(capability.ask.material_ids.includes('model-capabilities'))
   assert.ok(capability.ask.material_ids.includes('diagnostic-instructor-guide'))
-  assert.deepEqual(capability.ask.routes, ['home', 'approach', 'together', 'streaming', 'diagnose'])
+  assert.deepEqual(capability.ask.routes, ['home', 'resources', 'approach', 'together', 'streaming', 'diagnose'])
   assert.deepEqual(capability.ask.diagnostic_case_ids, [
     'healthy_text_renewal',
     'pings_only_no_progress',
@@ -816,4 +816,22 @@ test('maps provider access, credit, rate limit, and timeout errors without expos
     assert.equal(result.code, 'provider_timeout')
     assert.equal(calls, 1)
   })
+})
+
+test('answers Materials questions from the allowlisted resource summary', async () => {
+  let providerPrompt
+  const origin = await startServer({
+    env: { ANTHROPIC_API_KEY: 'server-only-key', ANTHROPIC_MODEL: 'claude-sonnet-5-5', MODEL_BUDGET_FILE: await temporaryBudget() },
+    cooldownMs: 0,
+    fetchImpl: async (url, options) => {
+      providerPrompt = JSON.parse(options.body).messages[0].content[0].text
+      return successResponse('Use Export my progress on Materials to download your browser learning record.')
+    }
+  })
+  const response = await ask(origin, { question: 'How do I export my work?', context: { route: 'resources' } })
+  assert.equal(response.status, 200)
+  assert.match(providerPrompt, /Materials page groups the core workflow/)
+  assert.match(providerPrompt, /Export my progress downloads the browser learning record/)
+  assert.doesNotMatch(providerPrompt, /The home route helps a learner choose/)
+  assert.equal(JSON.stringify(await response.json()).includes('server-only-key'), false)
 })

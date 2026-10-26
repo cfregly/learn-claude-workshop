@@ -349,10 +349,11 @@
       "expected_reference_result": "Report one confirmed write and one lost final explanation. Do not redispatch the write because the final stream is missing.",
       "recovery": "Reuse the confirmed receipt. Start a new final-explanation turn with the write tool disabled, or enforce dispatch deduplication by the stored operation key. Keep the lost response marked incomplete.",
       "verification": "Confirm the system of record still shows one write. Preserve the original tool request and result pairing in history. Complete a new explanation without redispatching the write, and inspect its end_turn and message_stop before marking the explanation complete.",
-      "optional_changed_case": "If the system of record has no matching receipt, mark the write outcome unknown and reconcile the operation before deciding whether a retry is safe.",
+      "optional_changed_case": "Change the evidence: HTTP 200, partial text, and a client tool_use request are followed by an SSE error before message_stop. No dispatch journal or CRM receipt is available. What is known, what remains unknown, and which evidence would make a retry safe? Would a new tool-use ID or reconnecting the stream prevent a duplicate write?",
       "no_paid_call_required": true,
       "app_trace_id": "opaque-fixture-H",
-      "trace_id_status": "Synthetic application correlation label. Not an Anthropic request ID, thinking signature, tool ID, or business idempotency key."
+      "trace_id_status": "Synthetic application correlation label. Not an Anthropic request ID, thinking signature, tool ID, or business idempotency key.",
+      "optional_changed_case_reference": "The write outcome is unknown. Missing confirmation does not prove no dispatch. Inspect the actual dispatch policy and journal, then the authoritative CRM state for this account and business operation. Proven dispatch_count=0 supports not sent; an authoritative commit supports saved. Hold an unsafe retry while reconciling. Mint the stable business operation key before the first attempt and enforce it at the write path across retries and new generations with different tool-use IDs. A transport reconnect does not resume the CRM transaction."
     }
   ]
 }

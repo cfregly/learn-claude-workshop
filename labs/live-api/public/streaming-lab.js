@@ -1292,7 +1292,7 @@ export function mountStreamingLab(host, { onSave, saved } = {}) {
     referenceButton.textContent = revealed[key] ? 'Hide completed reference' : 'Reveal completed reference'
     previousButton.disabled = index === 0
     nextButton.disabled = index === scenario.steps.length - 1
-    catchUpButton.disabled = index + 1 === scenario.catchUpStep
+    catchUpButton.disabled = index + 1 >= scenario.catchUpStep
   }
 
   prediction.addEventListener('input', () => {
@@ -1316,7 +1316,9 @@ export function mountStreamingLab(host, { onSave, saved } = {}) {
     render()
   })
   catchUpButton.addEventListener('click', () => {
-    stepByScenario[scenarioId] = currentScenario().catchUpStep - 1
+    const scenario = currentScenario()
+    if (currentStepIndex() + 1 >= scenario.catchUpStep) return
+    stepByScenario[scenarioId] = scenario.catchUpStep - 1
     save()
     render()
   })

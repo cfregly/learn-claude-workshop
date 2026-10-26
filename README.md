@@ -10,7 +10,9 @@ The live site's networked behavior is limited to bounded, text-only Claude Messa
 
 The streaming and tool-use trace, thinking lesson, model-capability snapshot, and optional feature guide are prepared course materials. The examples teach citations, structured outputs, prompt caching, app-owned memory, Skills, read-only programmatic tool calling, the advanced advisor pattern, and input token counting. They do not show that those features ran on the live site.
 
-The Engineer and Account Executive paths inspect the same prepared API draft and synthetic lineage. The Engineer traces access, credential, request, typed response, delivery, and recovery. The Account Executive checks the same draft against the records and decides whether it is ready for account planning. Claude for Work remains an optional alternate exercise.
+The Engineer and Account Executive paths inspect the same reviewed API draft and synthetic lineage. The Engineer traces access, credential, request, typed response, delivery, and recovery. The Account Executive checks the same draft against the records and decides whether it is ready for account planning. The Account Executive practice step then uses a separate, deliberately flawed draft so the learner can remove an unsupported discount claim. Claude for Work remains an optional alternate exercise.
+
+The optional live request returns text only. Streaming and tool use stay prepared teaching traces with synthetic events and receipts.
 
 Open the [diagnostics workshop](https://learn.fluxcapacitor.dev/#diagnose) to trace eight fixed synthetic cases across transport, backend, browser, UI, and client tool boundaries. The route replays prepared events and application observations. Its labels are not a provider wire capture, API measurement, or customer action.
 
@@ -48,6 +50,8 @@ Starting a fresh independent diagnostic attempt saves the current answers in the
 - [Direct API client offline tests](labs/test_claude_api_demo.py)
 - [Shared Engineer and Account Executive integration](labs/integration/shared-integration.js)
 - [Seven-step integration map](labs/integration/integration-map.js)
+- [Text-only live demo browser module](labs/live-api/public/live-demo.js)
+- [Prepared streaming and tool-use lab](labs/live-api/public/streaming-lab.js)
 - [Synthetic evaluation fixtures](labs/source-fixtures.json)
 - [Synthetic diagnostic replay](labs/diagnostics/diagnostics-lab.js)
 - [Diagnostic reference packets](labs/diagnostics/diagnostic-reference-packets.json)

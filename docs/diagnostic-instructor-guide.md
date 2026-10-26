@@ -74,3 +74,11 @@ Record only what the learner demonstrates in this exercise. Do not claim past le
 - [MDN server sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
 - [MDN ReadableStreamDefaultReader.read](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamDefaultReader/read)
 - [MDN TextDecoder.decode](https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder/decode)
+
+## When the write outcome is unknown
+
+Use case 8's changed evidence: HTTP 200 and partial text, a client tool request, then an SSE error before message_stop, with no dispatch journal or CRM receipt. Missing confirmation does not prove that no action occurred. The learner must inspect the actual dispatch gate and journal, then the authoritative account record. A missing log line alone proves nothing. A not-sent conclusion requires an authoritative gate that cannot dispatch without its pre-dispatch record.
+
+Distinguish proven not dispatched, confirmed saved, and unknown. Revalidate and authorize a bounded new attempt only when safe. Recover a confirmed result without repeating the write. Hold an unsafe retry while reconciling an unknown result and name its owner. Mint the stable business operation key before the first attempt and enforce it at the write path on every retry. A new generation can produce a new tool-use ID, so that ID alone does not prevent duplicate updates. Reconnecting the response stream does not resume a CRM transaction.
+
+The engineer explains the evidence and retry policy. A business learner states the supported account status and next owner. Rejoin at recovery and verification. The runnable baseline remains text-only. This write exercise is a prepared simulation.

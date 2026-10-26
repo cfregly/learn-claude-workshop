@@ -67,6 +67,7 @@ const MATERIAL_SUMMARIES = Object.freeze({
 
 const ROUTE_SUMMARIES = Object.freeze({
   home: 'The home route helps a learner choose a role and introduces the shared fictional Northstar account.',
+  resources: 'The Materials page groups the core workflow, references, and optional extensions. Read here renders material inline. Open in GitHub opens the pinned source. Back to your lesson returns to the selected activity. Export my progress downloads the browser learning record, including drafts, checks, attempts, and group questions. Nothing is uploaded by export.',
   approach: 'The approach route compares how the same workflow changes across audiences, activities, and evidence of learning.',
   together: 'The together route splits business and technical learners for a short activity, then rejoins them for teach-back and a readiness decision.',
   streaming: 'The streaming route focuses on typed events, partial output, terminal events, stop reasons, and safe failure handling.',
