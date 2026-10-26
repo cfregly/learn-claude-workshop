@@ -7,7 +7,7 @@ import { initAskClaude } from './ask-claude.js?v=20261025-rename'
 import { observeCodeBlocks } from './code-blocks.js?v=20261025-rename'
 import { mountStreamingLab } from './streaming-lab.js?v=20261025-rename'
 import { mountLiveWorkflow } from './live-workflow.js?v=20261026-live-workflow'
-const githubRef = '36c5f046ad565adcc469ceb3a41451cf9f9b2485'
+const githubRef = 'aae731b47e8d5c7f8a458c380a494ba0798af52d'
 const githubRoot = 'https://github.com/cfregly/learn-claude-workshop'
 const githubFile = path => `${githubRoot}/blob/${githubRef}/${path}`
 
