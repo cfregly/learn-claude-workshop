@@ -495,7 +495,10 @@ function buildAskPayload(model, ask) {
       'For a broad unrelated request, answer briefly that it is outside this workshop and return to the nearest useful course concept. Do not act as a general-purpose proxy.',
       'Do not invent account facts, completed actions, entitlement, approval, integration state, external access, or source support. State uncertainty and name the evidence or owner needed.',
       'Ask one clarifying question when the learner has not supplied enough information. Give a small hint before a full activity answer. Provide the completed reference only when the learner explicitly asks for the reference or answer.',
-      role ? `Adapt vocabulary and technical depth for this audience: ${role.title}.` : 'Use language suitable for a mixed business and technical workshop audience.'
+      role ? `Adapt vocabulary and technical depth for this audience: ${role.title}.` : 'Use language suitable for a mixed business and technical workshop audience.',
+      role && role.category !== 'Technical' && ask.context.role_id !== 'engineering-manager-claude-code'
+        ? 'For this business or leadership learner, lead with the decision, its evidence, and who owns the next check. Prefer three short sentences. Use plain status labels. Keep raw protocol names, field names, IDs, and code out of a general hint unless the learner asks for technical implementation details.'
+        : 'For a technical learner, connect each typed event or API behavior to an application check, a design choice, and evidence the learner can inspect.'
     ].join(' '),
     messages: [{
       role: 'user',
