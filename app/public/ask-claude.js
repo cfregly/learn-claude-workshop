@@ -1,4 +1,4 @@
-import { renderMarkdown } from './materials-viewer.js?v=20261025-rename'
+import { renderMarkdown } from './materials-viewer.js?v=learning-context-2'
 
 function node(tag, text = '', className = '') {
   const element = document.createElement(tag)
@@ -12,6 +12,9 @@ export function initAskClaude({ getContext }) {
   let activeKey = ''
   let busy = false
   let current
+  let excerpt = null
+  let returnFocus = null
+  let selectedBeforeOpen = null
   const launcher = node('button', 'Ask anything', 'ask-launcher button secondary')
   launcher.type = 'button'
   launcher.setAttribute('aria-haspopup', 'dialog')
@@ -27,6 +30,17 @@ export function initAskClaude({ getContext }) {
   close.setAttribute('aria-label', 'Close questions')
   header.append(heading, close)
   const contextLabel = node('p', '', 'ask-context small')
+  const excerptPanel = node('section', '', 'ask-excerpt')
+  excerptPanel.hidden = true
+  const excerptHeader = node('div', '', 'ask-excerpt-header')
+  const excerptLabel = node('strong', '', 'small')
+  const removeExcerpt = node('button', 'Remove', 'button quiet small')
+  removeExcerpt.type = 'button'
+  removeExcerpt.setAttribute('aria-label', 'Remove selected context')
+  const excerptText = node('div', '', 'ask-excerpt-text small')
+  const excerptNote = node('p', '', 'small muted')
+  excerptHeader.append(excerptLabel, removeExcerpt)
+  excerptPanel.append(excerptHeader, excerptText, excerptNote)
   const conversation = node('div', '', 'ask-conversation')
   const suggestions = node('div', '', 'ask-suggestions')
   const form = node('form', '', 'ask-form')
@@ -49,7 +63,9 @@ export function initAskClaude({ getContext }) {
   status.setAttribute('role', 'status')
   form.append(label, input, actions, status)
   const privacy = node('p', 'Your question and this lesson’s context go to Claude. Your working draft is not included. Questions do not change your progress.', 'small muted ask-privacy')
-  panel.append(header, contextLabel, conversation, suggestions, form, privacy)
+  const body = node('div', '', 'ask-body')
+  body.append(excerptPanel, conversation, suggestions)
+  panel.append(header, contextLabel, body, form, privacy)
   document.body.append(launcher, panel)
 
   function render() {
@@ -79,19 +95,50 @@ export function initAskClaude({ getContext }) {
     for (const text of followUps || current.suggestions || ['Explain this in simpler terms', 'Walk me through one example', 'What would change in a real application?']) {
       const suggestion = node('button', text, 'button secondary small')
       suggestion.type = 'button'
-      suggestion.addEventListener('click', () => { input.value = text; input.focus();if(followUps)form.requestSubmit() })
+      suggestion.addEventListener('click', () => { input.value = text; input.focus() })
       suggestions.append(suggestion)
     }
     clear.hidden = !thread.length
   }
 
-  launcher.addEventListener('click', () => {
+  function syncExcerpt() {
+    excerptPanel.hidden = !excerpt
+    excerptLabel.textContent = excerpt?.label || ''
+    excerptText.textContent = excerpt?.text || ''
+    excerptNote.textContent = excerpt?.truncated
+      ? `First 6,000 of ${excerpt.originalLength.toLocaleString()} characters. Select a smaller passage for a more focused question.`
+      : 'Included only when you press Ask Claude.'
+    privacy.textContent = excerpt
+      ? 'Your question, the shown excerpt, and this lesson’s context go to Claude. Questions do not change your progress.'
+      : 'Your question and this lesson’s context go to Claude. Your working draft is not included. Questions do not change your progress.'
+  }
+  function setThread() {
+    activeKey = JSON.stringify([current.context, current.threadKey || null, excerpt ? [excerpt.label, excerpt.text] : null])
+  }
+  function open(options = {}) {
     current = getContext()
-    activeKey = JSON.stringify([current.context,current.threadKey||null])
+    returnFocus = options.trigger || document.activeElement
+    excerpt = prepareSelectedContent(options.text, options.label)
+    setThread()
     contextLabel.textContent = current.label
     status.textContent = busy ? 'Claude is finishing the previous question. You can continue the lesson while it runs.' : ''
+    syncExcerpt()
     render()
-    panel.showModal()
+    if (!panel.open) panel.showModal()
+    input.focus()
+  }
+  launcher.addEventListener('pointerdown', () => { selectedBeforeOpen = readLearnerSelection(panel) })
+  launcher.addEventListener('click', () => {
+    const selection = selectedBeforeOpen || readLearnerSelection(panel)
+    selectedBeforeOpen = null
+    open(selection ? { ...selection, trigger: launcher } : { trigger: launcher })
+  })
+  removeExcerpt.addEventListener('click', () => {
+    if (busy) return
+    excerpt = null
+    setThread()
+    syncExcerpt()
+    render()
     input.focus()
   })
   close.addEventListener('click', () => panel.close())
@@ -100,7 +147,7 @@ export function initAskClaude({ getContext }) {
     const bounds = panel.getBoundingClientRect()
     if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) panel.close()
   })
-  panel.addEventListener('close', () => { launcher.focus({ preventScroll: true }) })
+  panel.addEventListener('close', () => { (returnFocus?.isConnected ? returnFocus : launcher).focus({ preventScroll: true }) })
   clear.addEventListener('click', () => {
     if (busy) return
     threads.delete(activeKey)
@@ -116,11 +163,13 @@ export function initAskClaude({ getContext }) {
     if (busy || !question) return
     const key = activeKey
     const context = current.context
+    const selectedContent = excerpt ? {label: excerpt.label, text: excerpt.text} : undefined
     const previous = threads.get(key) || []
     busy = true
     input.disabled = true
     submit.disabled = true
     clear.disabled = true
+    removeExcerpt.disabled = true
     for (const suggestion of suggestions.children) suggestion.disabled = true
     submit.textContent = 'Thinking…'
     status.textContent = 'Claude is using the current lesson and your question.'
@@ -128,7 +177,7 @@ export function initAskClaude({ getContext }) {
     try {
       const response = await fetch('/api/ask', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({question, context, history: previous.slice(-4).map(({role, content}) => ({role, content: content.slice(0,2000)}))}),
+        body: JSON.stringify({question, context, ...(selectedContent ? {selected_content: selectedContent} : {}), history: previous.slice(-4).map(({role, content}) => ({role, content: content.slice(0,2000)}))}),
         signal: AbortSignal.timeout(30000)
       })
       const data = await response.json()
@@ -156,13 +205,15 @@ export function initAskClaude({ getContext }) {
       input.disabled = false
       submit.disabled = false
       clear.disabled = false
+      removeExcerpt.disabled = false
       for (const suggestion of suggestions.children) suggestion.disabled = false
       submit.textContent = 'Ask Claude'
       status.removeAttribute('aria-busy')
       if (panel.open) input.focus({preventScroll:true})
     }
   })
-  return { refreshContext() { if (panel.open && !busy) { current=getContext();activeKey=JSON.stringify([current.context,current.threadKey||null]);contextLabel.textContent=current.label;render() } } }
+  installContextActions({open, panel})
+  return { open, refreshContext() { if (panel.open && !busy) { current=getContext();setThread();contextLabel.textContent=current.label;render() } } }
 }
 
 export function suggestedFollowUps(answer,context={}) {
@@ -193,4 +244,86 @@ export function suggestedFollowUps(answer,context={}) {
   return engineer
     ? ['Show me a small working example.','How would I test the failure case?']
     : ['Show this with the Northstar example.','What would I check before using it?']
+}
+
+
+export function prepareSelectedContent(text, label = 'Selected passage') {
+  const value = String(text || '').trim()
+  if (!value) return null
+  return {
+    label: String(label || 'Selected passage').trim().slice(0, 160),
+    text: value.slice(0, 6000).replace(/[\uD800-\uDBFF]$/, ''),
+    truncated: value.length > 6000,
+    originalLength: value.length
+  }
+}
+
+function readLearnerSelection(panel) {
+  const active = document.activeElement
+  if (panel.contains(active)) return null
+  if (active?.matches('textarea,input[type="text"],input:not([type])')) {
+    const text = active.value.slice(active.selectionStart || 0, active.selectionEnd || 0)
+    return text.trim() ? {text, label: 'Selected text from your work'} : null
+  }
+  const selection = window.getSelection()
+  if (!selection || selection.isCollapsed || !selection.toString().trim()) return null
+  const anchor = selection.anchorNode?.parentElement
+  if (anchor?.closest('#ask-claude,header,footer,nav')) return null
+  return {text: selection.toString(), label: 'Selected passage'}
+}
+
+function widgetContent(widget) {
+  if (widget.classList.contains('code-block-wrap')) return widget.querySelector('pre')?.textContent || ''
+  const clone = widget.cloneNode(true)
+  for (const element of clone.querySelectorAll('button,input,textarea,select,[hidden],[role="status"],.code-toolbar,script,style')) element.remove()
+  return clone.innerText || clone.textContent || ''
+}
+
+function widgetLabel(widget) {
+  const heading = widget.querySelector('h2,h3,h4,summary,.code-label,.source-tag')
+  return (heading?.textContent || (widget.classList.contains('code-block-wrap') ? 'Code example' : 'This activity')).trim().slice(0, 160)
+}
+
+function installContextActions({open, panel}) {
+  const selectionAction = node('button', 'Ask about selection', 'ask-selection button secondary small')
+  selectionAction.type = 'button'
+  selectionAction.hidden = true
+  document.body.append(selectionAction)
+  let selection = null
+  function updateSelection() {
+    if (panel.open) { selectionAction.hidden = true; return }
+    selection = readLearnerSelection(panel)
+    selectionAction.hidden = !selection
+  }
+  document.addEventListener('selectionchange', updateSelection)
+  selectionAction.addEventListener('pointerdown', event => event.preventDefault())
+  selectionAction.addEventListener('click', () => {
+    if (!selection) return
+    open({...selection,trigger:selectionAction})
+    selectionAction.hidden = true
+  })
+  panel.addEventListener('close', updateSelection)
+  const selector = '.code-block-wrap,.source-fact,.workflow,.draft,.integration-map-host,.route-content,.quiz,.live-workflow-output,.diagnostic-case,.streaming-lab-trace > section,details.reference'
+  function enhance(root) {
+    const widgets = [...(root.matches?.(selector) ? [root] : []), ...(root.querySelectorAll?.(selector) || [])]
+    for (const widget of widgets) {
+      if (widget.closest('#ask-claude') || widget.dataset.askReady) continue
+      // A code block owns its action even when it sits inside a reference.
+      if (widget.matches('details.reference') && widget.querySelector('.code-block-wrap')) continue
+      widget.dataset.askReady = 'true'
+      const action = node('button', 'Ask', 'ask-widget-button button quiet small')
+      action.type = 'button'
+      const label = widgetLabel(widget)
+      action.setAttribute('aria-label', `Ask about ${label}`)
+      action.addEventListener('click', () => open({text:widgetContent(widget),label,trigger:action}))
+      const toolbar = widget.querySelector('.code-toolbar')
+      if (toolbar) toolbar.append(action)
+      else if (widget.matches('details')) widget.querySelector('summary')?.after(action)
+      else widget.prepend(action)
+    }
+  }
+  enhance(document.body)
+  new MutationObserver(records => {
+    for (const record of records) for (const added of record.addedNodes) if (added.nodeType === 1) enhance(added)
+  }).observe(document.body,{childList:true,subtree:true})
 }

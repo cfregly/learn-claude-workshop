@@ -155,8 +155,7 @@ function appendLink(documentRef, parent, label, href, githubRef) {
   const link = element(documentRef, 'a', label)
   link.href = target
   if (href.startsWith('github:')) {
-    link.target = '_blank'
-    link.rel = 'noopener noreferrer'
+      link.rel = 'noopener noreferrer'
   }
   parent.append(link)
 }

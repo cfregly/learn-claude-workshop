@@ -47,5 +47,5 @@ export function mountSharedIntegration(host,{role='engineer',githubRef='main',sh
   const mapHost=el(doc,'div','','integration-map-host');mapHost.dataset.role=role;map.append(mapHost);host.append(map)
   if(showLearningCheck)host.append(el(doc,'p',engineer?'Learning check: explain one access boundary, one response field, and the next check when the visible result is incomplete.':'Learning check: name one supported customer claim, one unknown, and the person who owns the next action.','small'))
   if(showModeHint)host.append(el(doc,'p','Prepared synthetic reference. This lab simulates the request, typed response, and review boundary without a model or tool call.','small muted'))
-  const source=el(doc,'a','Open this shared reference in GitHub','small');source.href=`https://github.com/cfregly/learn-claude-workshop/blob/${githubRef}/labs/integration/shared-integration.js`;source.target='_blank';source.rel='noopener noreferrer';host.append(source)
+  const source=el(doc,'a','Open this shared reference in GitHub','small');source.href=`https://github.com/cfregly/learn-claude-workshop/blob/${githubRef}/labs/integration/shared-integration.js`;source.rel='noopener noreferrer';host.append(source)
 }

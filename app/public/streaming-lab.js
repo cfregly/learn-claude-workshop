@@ -1130,7 +1130,6 @@ export function mountStreamingLab(host, { onSave, saved } = {}) {
   )
   const progressLink = progressDetails.lastElementChild
   progressLink.href = 'https://platform.claude.com/docs/en/build-with-claude/thinking#progress-updates-between-tool-calls'
-  progressLink.target = '_blank'
   progressLink.rel = 'noopener noreferrer'
 
   host.append(

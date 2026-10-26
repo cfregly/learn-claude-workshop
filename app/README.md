@@ -28,6 +28,8 @@ Follow the request is an annotated prepared streaming and tool-use trace. The op
 
 The public code and source notes live in https://github.com/cfregly/learn-claude-workshop. The workshop renders them inline and links to the matching GitHub version. The Northstar filenames identify the fictional case, not a separate app.
 
+References open over the current lesson so the learner can return to the same draft or trace. Code has syntax highlighting, wraps within the view, and copies as plain source. Select a passage or use a panel’s Ask button to add visible context to a question. The excerpt can be removed, and no question is sent until the learner presses Ask Claude.
+
 ## Diagnose a stalled draft
 
 Open the diagnosis lab from the technical demonstration or activity. Eight synthetic packets trace Claude SSE, the backend parser and relay, browser delivery, application state, and visible UI. Learners record a boundary, one discriminating check, and a repair with customer-visible verification before opening the completed reference. A small parsed-payload simulation tests append versus replace. The selected role changes the goal. Facilitator view exposes the instructor key and rubric. All packet timings, IDs, failures, and receipts are synthetic, not API measurements or wire replay fixtures.

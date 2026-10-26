@@ -178,3 +178,39 @@ footer { padding-bottom: 84px; }
   .live-workflow-draft{min-height:180px;padding:17px}
 }
 @media print{.lesson-demo-switcher,.streaming-mode,.live-workflow-roles,.live-workflow-controls{display:none}.live-workflow-draft{min-height:0}}
+
+/* Context stays visible while a learner asks a question. */
+.ask-selection{position:fixed;right:24px;bottom:78px;z-index:21;max-width:calc(100vw - 32px);background:var(--paper)!important;color:var(--ink)!important;box-shadow:0 4px 18px rgba(0,0,0,.10)}
+.ask-excerpt{margin:0 0 24px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.ask-excerpt-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ask-excerpt-text{max-height:160px;overflow-y:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0 12px;line-height:1.6}
+.ask-excerpt p{margin-bottom:0}
+.ask-widget-button{float:right;position:relative;z-index:1;margin:0 0 4px 12px;min-height:36px;padding:5px 10px!important;background:var(--paper)!important;color:var(--ink)!important}
+.code-toolbar .ask-widget-button{float:none;margin:0;opacity:1}
+@media(hover:hover){.ask-widget-button{opacity:0}.source-fact:hover>.ask-widget-button,.workflow:hover>.ask-widget-button,.draft:hover>.ask-widget-button,.live-workflow-output:hover>.ask-widget-button,.diagnostic-case:hover>.ask-widget-button,.reference:hover>.ask-widget-button,.ask-widget-button:focus-visible,:focus-within>.ask-widget-button{opacity:1}}
+@media(max-width:760px){.ask-selection{right:16px;bottom:70px}.ask-widget-button{opacity:1}.ask-excerpt-text{max-height:120px}}
+
+.material-reader{width:min(1040px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);margin:auto;padding:0;border:0;border-radius:12px;background:var(--paper);color:var(--ink);box-shadow:0 14px 48px rgba(0,0,0,.22);overflow:hidden}
+.material-reader[open]{display:flex;flex-direction:column}.material-reader::backdrop{background:rgba(18,30,24,.42)}
+.material-reader-bar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px 24px;padding:14px 24px;border-bottom:1px solid var(--line)}.material-reader-bar p,.material-reader-bar .actions{margin:0}.material-reader-bar .button{min-height:44px}
+.material-reader-content{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}.material-reader-content>.page{padding:32px 40px 56px}.material-reader #material-reader-title{margin-top:0;font-size:clamp(1.8rem,3.5vw,2.7rem);line-height:1.15}.material-reader [data-material-body]{max-width:75ch}
+@media(max-width:640px){.material-reader{width:calc(100vw - 16px);max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}.material-reader-bar{align-items:stretch;flex-direction:column;padding:12px 16px}.material-reader-bar .actions{gap:8px}.material-reader-content>.page{padding:24px 20px 40px}}
+.code-block-wrap .code-token-comment,.code-block-wrap .code-token-operator{color:var(--code-token-punctuation)}
+.code-block-wrap .code-token-keyword{color:var(--code-token-boolean)}
+.code-block-wrap .code-token-function{color:var(--code-token-number)}
+.code-block-wrap .code-token-builtin{color:var(--code-token-key)}
+.code-block-wrap .code-token-variable{color:var(--code-token-null)}
+.code-block-wrap .code-token-regex{color:var(--code-token-string)}
+
+.ask-panel[open]{display:flex;flex-direction:column;overflow:hidden}
+.ask-header,.ask-context,.ask-form,.ask-privacy{flex:none}
+.ask-context{margin:10px 0 12px}
+.ask-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;margin:0 -8px 12px 0;padding-right:8px}
+.ask-body .ask-message:first-child{margin-top:8px}
+.ask-body .ask-excerpt{margin-bottom:16px;padding:8px 0}
+.ask-body .ask-excerpt-text{max-height:110px}
+.ask-form textarea{min-height:80px;max-height:180px;resize:vertical}
+.ask-form .actions{margin:8px 0}
+.ask-form .ask-status{margin:4px 0 8px;font-size:.75rem}
+.ask-privacy{margin-bottom:0;padding-top:8px}
+@media(max-width:760px){.ask-body .ask-excerpt-text{max-height:90px}.ask-form textarea{min-height:72px;max-height:140px}}

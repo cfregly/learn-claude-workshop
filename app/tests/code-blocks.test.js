@@ -188,7 +188,7 @@ test('tokenizeCode identifies every JSON role without changing visible text', ()
   const tokens = tokenizeCode(source, 'json')
   assert.equal(tokens.map(token => token.text).join(''), source)
   assert.deepEqual(new Set(tokens.map(token => token.type)), new Set([
-    'plain', 'punctuation', 'key', 'string', 'number', 'boolean', 'null'
+    'plain', 'punctuation', 'operator', 'key', 'string', 'number', 'boolean', 'null'
   ]))
   assert.equal(tokens.find(token => token.type === 'key')?.text, '"account"')
   assert.equal(tokens.find(token => token.type === 'string')?.text, '"Northstar <script>"')
@@ -358,4 +358,85 @@ test('observer preserves an external JSON code reference across updates and exac
     else delete globalThis.navigator
   }
   assert.deepEqual(copied, [visible])
+})
+
+test('Python highlighting identifies comments, keywords, functions, and builtins without changing source', () => {
+  const source = '# approved records only\ndef build_brief(account, limit=2):\n    return len(account["facts"]) if account else limit\n'
+  const tokens = tokenizeCode(source, 'python')
+  assert.equal(tokens.map(token => token.text).join(''), source)
+  const types = new Set(tokens.map(token => token.type))
+  for (const type of ['comment', 'keyword', 'function', 'builtin', 'string', 'number', 'operator', 'punctuation']) {
+    assert.equal(types.has(type), true, `missing Python token type: ${type}`)
+  }
+})
+
+test('JavaScript aliases highlight an existing code node while preserving its identity and attributes', () => {
+  const documentRef = new TestDocument()
+  const root = documentRef.createElement('main')
+  const pre = documentRef.createElement('pre')
+  pre.dataset.language = 'js'
+  const code = documentRef.createElement('code')
+  code.className = 'lesson-source language-js'
+  code.setAttribute('data-annotation', 'keep')
+  const source = 'const review = facts => facts.filter(item => item.approved === true)\n'
+  code.textContent = source
+  pre.append(code)
+  root.append(pre)
+
+  assert.equal(enhanceCodeBlocks(root), 1)
+  assert.equal(pre.firstElementChild, code)
+  assert.equal(code.textContent, source)
+  assert.equal(code.classList.contains('lesson-source'), true)
+  assert.equal(code.classList.contains('language-javascript'), true)
+  assert.equal(code.attributes.get('data-annotation'), 'keep')
+  assert.ok(code.querySelectorAll('.code-token-keyword').length > 0)
+  assert.ok(code.querySelectorAll('.code-token-function').length > 0)
+})
+
+test('every supported lesson grammar reconstructs its exact input', () => {
+  const samples = new Map([
+    ['json', '{"ready":true,"count":2}'],
+    ['python', 'print("ready")\n'],
+    ['javascript', 'console.log("ready")\n'],
+    ['typescript', 'const ready: boolean = true\n'],
+    ['bash', 'printf "%s\\n" "$STATUS"\n'],
+    ['sql', 'SELECT status FROM accounts WHERE id = 2;\n']
+  ])
+  for (const [language, source] of samples) {
+    const tokens = tokenizeCode(source, language)
+    assert.equal(tokens.map(token => token.text).join(''), source, language)
+    assert.ok(tokens.some(token => token.type !== 'plain'), `${language} should have semantic tokens`)
+  }
+})
+
+test('non-JSON highlighting keeps unsafe HTML literal and exact clipboard text', async () => {
+  const documentRef = new TestDocument()
+  const root = documentRef.createElement('main')
+  const pre = documentRef.createElement('pre')
+  pre.dataset.language = 'python'
+  const code = documentRef.createElement('code')
+  const source = 'message = "</span><img src=x onerror=alert(1)>"\n'
+  code.textContent = source
+  pre.append(code)
+  root.append(pre)
+
+  enhanceCodeBlocks(root)
+  assert.equal(pre.firstElementChild, code)
+  assert.equal(pre.textContent, source)
+  assert.equal(root.querySelectorAll('img').length, 0)
+  assert.ok(code.querySelectorAll('.code-token-string').some(node => node.textContent.includes('<img src=x')))
+
+  const copied = []
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: { clipboard: { writeText: async value => copied.push(value) } }
+  })
+  try {
+    await root.querySelector('.code-copy-button').click()
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, 'navigator', descriptor)
+    else delete globalThis.navigator
+  }
+  assert.deepEqual(copied, [source])
 })

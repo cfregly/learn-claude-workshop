@@ -1,0 +1,1 @@
+globalThis.Prism = { manual: true }
