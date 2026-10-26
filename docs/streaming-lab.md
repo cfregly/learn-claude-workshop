@@ -2,6 +2,8 @@
 
 This ten minute Northstar replay uses prepared synthetic events. It makes no network request, calls no model, and performs no account action.
 
+The event ordering and partial JSON explanations adapt the [official streaming documentation](https://platform.claude.com/docs/en/build-with-claude/streaming). The Northstar traces, task, and failure exercises apply those interfaces to this workshop. See [sources and attribution](source-and-attribution.md).
+
 ## Choose the replay or live route
 
 - **Replay for repeatable teaching and failures.** Stay in this lab at [Streaming events](https://learn.fluxcapacitor.dev/#streaming). Run the same happy, unauthorized, and interrupted traces without a credential or provider call.

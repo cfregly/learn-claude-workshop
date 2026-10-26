@@ -4,6 +4,12 @@ This repository contains the complete public source for [learn.fluxcapacitor.dev
 
 The workshop uses one source set and one review standard across its audience paths. Engineers trace typed events, tool input, authorization, and failure boundaries. Account Executives check the same draft against its sources and decide whether it is ready for account planning. Generated drafts always require human source review.
 
+## Skills, tools, and MCP example
+
+Start with the [Northstar Skill and MCP example](docs/skills-tools-example.md). It separates the renewal procedure, application access checks, a local MCP tool, and native Skill execution. Each lab records what actually ran and which parts remain prepared teaching material.
+
+The workshop uses documented Claude and MCP interfaces. The Northstar case, role exercises, application controls, and tests are maintained in this repository. Protocol explanations adapt the cited vendor documentation. See [sources and attribution](docs/source-and-attribution.md) for that distinction.
+
 ## Run the app
 
 Use Node.js 22 or later.
