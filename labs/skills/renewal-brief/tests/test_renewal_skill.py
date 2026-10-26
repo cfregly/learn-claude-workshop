@@ -19,6 +19,12 @@ from renewal_skill.bundle import (  # noqa: E402
     verify_pin_bundle,
 )
 from renewal_skill.evidence import build_evidence  # noqa: E402
+from renewal_skill.provider import (  # noqa: E402
+    OFFICIAL_BASE_URL,
+    ProviderEndpointError,
+    ambiguous_method_failure,
+    require_official_base_url,
+)
 from scripts.contract import ContractError, sha256_json, validate_record  # noqa: E402
 from scripts.render_brief import BUNDLE_MARKER, BriefError, build_brief, render  # noqa: E402
 
@@ -146,6 +152,44 @@ class BundleTests(unittest.TestCase):
         }
         with self.assertRaises(BundleError):
             verify_pin_bundle(pin, SKILL_ROOT)
+
+
+class ProviderBoundaryTests(unittest.TestCase):
+    def test_nonofficial_environment_override_fails_without_echoing_url(self) -> None:
+        for unexpected in (
+            "https://credential@example.invalid/provider",
+            "https://api.anthropic.com:not-a-port",
+        ):
+            with self.subTest(unexpected=unexpected):
+                with self.assertRaises(ProviderEndpointError) as caught:
+                    require_official_base_url({"ANTHROPIC_BASE_URL": unexpected})
+                self.assertNotIn(unexpected, str(caught.exception))
+                self.assertNotIn("not-a-port", str(caught.exception))
+
+    def test_official_environment_override_is_accepted(self) -> None:
+        self.assertEqual(
+            require_official_base_url({"ANTHROPIC_BASE_URL": OFFICIAL_BASE_URL + "/"}),
+            OFFICIAL_BASE_URL,
+        )
+
+    def test_any_method_exception_keeps_provider_accounting_unknown(self) -> None:
+        class AmbiguousError(RuntimeError):
+            request_id = "req_test"
+
+        fields = ambiguous_method_failure(
+            method_field="messages_method_invocations",
+            base_url=OFFICIAL_BASE_URL,
+            error=AmbiguousError(
+                "response parse failed after dispatch state became ambiguous"
+            ),
+        )
+        self.assertEqual(fields["messages_method_invocations"], 1)
+        self.assertIsNone(fields["provider_calls"])
+        self.assertEqual(
+            fields["provider_request_and_usage_state"],
+            "unknown_after_method_exception",
+        )
+        self.assertEqual(fields["provider"]["request_id"], "req_test")
 
 
 class EvidenceTests(unittest.TestCase):
@@ -382,6 +426,50 @@ class EvidenceTests(unittest.TestCase):
             with self.subTest(name=name):
                 evidence = self._evidence(changed, pin, record, output)
                 self.assertFalse(evidence["skill_access_proof"]["passed"])
+
+    def test_canonical_output_hash_rejects_python_equal_type_drift(self) -> None:
+        response, pin, record, output = self._authored_response()
+
+        def discount_bool_to_int(value: dict) -> None:
+            value["facts"]["discount_approved"] = 0
+
+        def schema_int_to_bool(value: dict) -> None:
+            value["schema_version"] = True
+
+        def user_int_to_float(value: dict) -> None:
+            value["facts"]["weekly_active_users"] = 64.0
+
+        for name, mutate in (
+            ("bool_to_int", discount_bool_to_int),
+            ("int_to_bool", schema_int_to_bool),
+            ("int_to_float", user_int_to_float),
+        ):
+            with self.subTest(name=name):
+                changed = copy.deepcopy(response)
+                lines = changed["content"][6]["content"]["stdout"].splitlines()
+                rendered = json.loads(lines[1].removeprefix("RENEWAL_BRIEF_OUTPUT "))
+                mutate(rendered)
+                lines[1] = "RENEWAL_BRIEF_OUTPUT " + json.dumps(
+                    rendered, sort_keys=True, separators=(",", ":")
+                )
+                changed["content"][6]["content"]["stdout"] = "\n".join(lines)
+                evidence = self._evidence(changed, pin, record, output)
+                self.assertFalse(evidence["skill_access_proof"]["passed"])
+                self.assertFalse(
+                    evidence["skill_access_proof"]["deterministic_output_matched"]
+                )
+
+    def test_duplicate_json_key_cannot_pass_deterministic_output_proof(self) -> None:
+        response, pin, record, output = self._authored_response()
+        changed = copy.deepcopy(response)
+        lines = changed["content"][6]["content"]["stdout"].splitlines()
+        prefix = "RENEWAL_BRIEF_OUTPUT "
+        payload = lines[1].removeprefix(prefix)
+        lines[1] = prefix + '{"account_id":"northstar-freight",' + payload[1:]
+        changed["content"][6]["content"]["stdout"] = "\n".join(lines)
+        evidence = self._evidence(changed, pin, record, output)
+        self.assertFalse(evidence["skill_access_proof"]["passed"])
+        self.assertIsNone(evidence["skill_access_proof"]["deterministic_output"])
 
 
 if __name__ == "__main__":

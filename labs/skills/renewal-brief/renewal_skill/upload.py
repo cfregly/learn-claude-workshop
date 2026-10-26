@@ -7,6 +7,13 @@ from typing import Any
 
 from .bundle import BUNDLE_NAME, bundle_manifest, default_skill_root, staged_bundle
 from .io import utc_now, write_json_atomic
+from .provider import (
+    ProviderEndpointError,
+    ambiguous_method_failure,
+    request_id_from,
+    require_official_base_url,
+    verify_client_base_url,
+)
 
 
 CONFIRMATION = "CREATE_OR_VERSION_WORKSPACE_SKILL"
@@ -47,21 +54,60 @@ def main() -> int:
 
     manifest = bundle_manifest(args.skill_root)
     try:
+        base_url = require_official_base_url()
+    except ProviderEndpointError as error:
+        raise SystemExit(str(error)) from error
+    try:
         import anthropic
         from anthropic.lib import files_from_dir
     except ImportError as error:
         raise SystemExit("Install requirements-skills.txt before uploading") from error
 
-    client = anthropic.Anthropic(max_retries=0, timeout=args.timeout_seconds)
-    operation: str
+    client = anthropic.Anthropic(
+        base_url=base_url,
+        max_retries=0,
+        timeout=args.timeout_seconds,
+    )
+    try:
+        effective_base_url = verify_client_base_url(client)
+    except ProviderEndpointError as error:
+        raise SystemExit(str(error)) from error
+    operation = "create_version" if args.existing_skill_id else "create_skill"
     with staged_bundle(args.skill_root) as staged:
         request: dict[str, Any] = {"files": files_from_dir(staged)}
-        if args.existing_skill_id:
-            operation = "create_version"
-            result = client.skills.versions.create(
-                skill_id=args.existing_skill_id,
-                **request,
+        try:
+            if args.existing_skill_id:
+                result = client.skills.versions.create(
+                    skill_id=args.existing_skill_id,
+                    **request,
+                )
+            else:
+                request["display_name"] = args.display_name
+                result = client.skills.create(**request)
+        except Exception as error:
+            failure = {
+                "schema_version": 1,
+                "status": "SKILLS_METHOD_ERROR_NO_RETRY",
+                "operation": operation,
+                "bundle_sha256": manifest["bundle_sha256"],
+                "bundle_files": manifest["files"],
+                "sdk": {"package": "anthropic", "version": anthropic.__version__},
+                "created_at": utc_now(),
+                "retry_attempted": False,
+                "raw_response_persisted": False,
+            }
+            failure.update(
+                ambiguous_method_failure(
+                    method_field="skills_method_invocations",
+                    base_url=effective_base_url,
+                    error=error,
+                )
             )
+            write_json_atomic(args.pin_file, failure)
+            print(f"Skill upload method failed without retry. Receipt: {args.pin_file}")
+            return 2
+
+        if args.existing_skill_id:
             if getattr(result, "type", None) != "skill_version":
                 raise RuntimeError("version upload did not return a SkillVersion")
             skill_id = getattr(result, "skill_id", None)
@@ -73,9 +119,6 @@ def main() -> int:
                 )
             source_type = "custom"
         else:
-            operation = "create_skill"
-            request["display_name"] = args.display_name
-            result = client.skills.create(**request)
             if getattr(result, "type", None) != "skill":
                 raise RuntimeError("upload did not return a Skill")
             skill_id = getattr(result, "id", None)
@@ -105,8 +148,14 @@ def main() -> int:
         "bundle_files": manifest["files"],
         "sdk": {"package": "anthropic", "version": anthropic.__version__},
         "api_surface": "GA Skills API",
+        "provider": {
+            "base_url": effective_base_url,
+            "request_id": request_id_from(result),
+        },
         "uploaded_at": utc_now(),
         "provider_calls": 1,
+        "skills_method_invocations": 1,
+        "provider_response_received": True,
         "raw_response_persisted": False,
     }
     write_json_atomic(args.pin_file, pin)

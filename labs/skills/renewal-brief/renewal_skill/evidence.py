@@ -17,12 +17,24 @@ OUTPUT_PREFIX = "RENEWAL_BRIEF_OUTPUT "
 SHELL_META_RE = re.compile(r"[;&|#\r\n<>`]")
 
 
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("duplicate JSON key")
+        value[key] = item
+    return value
+
+
 def _parse_prefixed_json(stdout: str, prefix: str) -> dict[str, Any] | None:
     for line in stdout.splitlines():
         if line.startswith(prefix):
             try:
-                value = json.loads(line[len(prefix) :])
-            except json.JSONDecodeError:
+                value = json.loads(
+                    line[len(prefix) :],
+                    object_pairs_hook=_unique_object,
+                )
+            except (json.JSONDecodeError, ValueError):
                 return None
             if not isinstance(value, dict):
                 return None
@@ -306,7 +318,10 @@ def build_evidence(
         and marker.get("input_sha256") == expected_input_hash
         and marker.get("output_sha256") == expected_output_hash
     )
-    deterministic_output_matched = rendered_output == expected_output
+    rendered_output_hash = (
+        sha256_json(rendered_output) if rendered_output is not None else None
+    )
+    deterministic_output_matched = rendered_output_hash == expected_output_hash
 
     returned_model = raw.get("model")
     returned_effort = raw.get("effort")
@@ -390,6 +405,7 @@ def build_evidence(
             "bundled_script_invocation_succeeded": script_invocation_seen,
             "marker_matched": marker_matched,
             "deterministic_output_matched": deterministic_output_matched,
+            "deterministic_output_sha256": rendered_output_hash,
             "marker": marker,
             "deterministic_output": rendered_output,
             "proof_scope": (

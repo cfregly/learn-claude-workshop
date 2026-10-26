@@ -4,7 +4,6 @@ import argparse
 import hashlib
 import json
 import os
-import re
 from pathlib import Path
 from typing import Any
 
@@ -14,24 +13,19 @@ from scripts.render_brief import build_brief
 from .bundle import default_skill_root, verify_pin_bundle
 from .evidence import build_evidence
 from .io import read_json, utc_now, write_json_atomic
+from .provider import (
+    ProviderEndpointError,
+    ambiguous_method_failure,
+    request_id_from,
+    require_official_base_url,
+    verify_client_base_url,
+)
 
 
 CONFIRMATION = "RUN_ONE_NATIVE_SKILL_MESSAGE"
 ALLOWED_MODELS = ("claude-opus-5-5", "claude-fable-5-1")
 TOOL_VERSION = "code_execution_20260521"
 MAX_OUTPUT_TOKENS = 16_384
-
-
-def _safe_error(error: Exception) -> dict[str, Any]:
-    message = str(error)
-    message = re.sub(r"sk-ant-[A-Za-z0-9_-]+", "[REDACTED_API_KEY]", message)
-    message = re.sub(r"(?i)Bearer\s+\S+", "Bearer [REDACTED]", message)
-    return {
-        "type": type(error).__name__,
-        "status_code": getattr(error, "status_code", None),
-        "request_id": getattr(error, "request_id", None),
-        "message": message[:1_000],
-    }
 
 
 def _validate_pin(pin: dict[str, Any]) -> None:
@@ -97,13 +91,25 @@ def main() -> int:
     expected_output = build_brief(record)
     prompt = build_prompt(record)
     prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    try:
+        base_url = require_official_base_url()
+    except ProviderEndpointError as error:
+        raise SystemExit(str(error)) from error
 
     try:
         import anthropic
     except ImportError as error:
         raise SystemExit("Install requirements-skills.txt before a live run") from error
 
-    client = anthropic.Anthropic(max_retries=0, timeout=args.timeout_seconds)
+    client = anthropic.Anthropic(
+        base_url=base_url,
+        max_retries=0,
+        timeout=args.timeout_seconds,
+    )
+    try:
+        effective_base_url = verify_client_base_url(client)
+    except ProviderEndpointError as error:
+        raise SystemExit(str(error)) from error
     request: dict[str, Any] = {
         "model": args.model,
         "max_tokens": args.max_tokens,
@@ -123,18 +129,10 @@ def main() -> int:
     try:
         response = client.messages.create(**request)
     except Exception as error:
-        api_error = isinstance(error, anthropic.APIError)
         failure = {
             "schema_version": 1,
             "created_at": utc_now(),
-            "status": "API_ERROR_NO_RETRY" if api_error else "LOCAL_ERROR_NO_RETRY",
-            "messages_method_invocations": 1,
-            "provider_calls": None if api_error else 0,
-            "provider_request_and_usage_state": (
-                "unknown_after_api_error"
-                if api_error
-                else "not_observed_for_local_error"
-            ),
+            "status": "MESSAGES_METHOD_ERROR_NO_RETRY",
             "request": {
                 "model": args.model,
                 "output_config": {"effort": args.effort},
@@ -145,7 +143,6 @@ def main() -> int:
                 "bundle_sha256": manifest["bundle_sha256"],
                 "prompt_sha256": prompt_hash,
             },
-            "error": _safe_error(error),
             "retry_attempted": False,
             "fallback_model_attempted": False,
             "privacy": {
@@ -154,6 +151,13 @@ def main() -> int:
                 "api_key_persisted": False,
             },
         }
+        failure.update(
+            ambiguous_method_failure(
+                method_field="messages_method_invocations",
+                base_url=effective_base_url,
+                error=error,
+            )
+        )
         write_json_atomic(args.evidence_file, failure)
         print(f"Request path failed without retry. Evidence: {args.evidence_file}")
         return 2
@@ -176,6 +180,10 @@ def main() -> int:
             if evidence["skill_access_proof"]["passed"]
             else "PROOF_FAILED",
             "sdk": {"package": "anthropic", "version": anthropic.__version__},
+            "provider": {
+                "base_url": effective_base_url,
+                "request_id": request_id_from(response),
+            },
             "retry_attempted": False,
             "fallback_model_attempted": False,
         }

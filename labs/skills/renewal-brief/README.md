@@ -17,7 +17,8 @@ The configured path follows the current official API shape checked October 26, 2
 3. `renewal_skill.run_live` recomputes the bundle hash and rejects any drift from the pin.
 4. It is designed to invoke `messages.create` once with the pinned custom Skill in `container.skills`, `code_execution_20260521`, and `output_config.effort=max`.
 5. It requires paired successful server tool results for reading the installed `SKILL.md`, hashing the mounted executable files, and running the bundled deterministic renderer.
-6. It compares the renderer's input and output hashes with local deterministic results. Narration alone cannot pass.
+6. It compares the renderer's input and canonical JSON output hashes with local deterministic results. Duplicate JSON keys and Python-equal type substitutions cannot pass.
+7. Both provider paths set `https://api.anthropic.com` explicitly. A non-official `ANTHROPIC_BASE_URL` override fails before an SDK method invocation and its value is not printed.
 
 Official sources:
 
@@ -88,7 +89,7 @@ To create a new version of the same workspace Skill, add the real existing ID:
 --existing-skill-id skill_...
 ```
 
-The uploader invokes one Skills SDK method and configures SDK retries to zero. A successful response is required before it writes a pin. It does not persist a raw API response or credential.
+The uploader invokes one Skills SDK method and configures SDK retries to zero. A successful response is required before it writes a success pin. If that method raises, it writes a failure receipt with provider request and usage state marked unknown. It does not persist a raw API response or credential.
 
 ## Two opt-in native Skill runs
 
@@ -117,7 +118,7 @@ cd labs/skills/renewal-brief
   --confirm-live RUN_ONE_NATIVE_SKILL_MESSAGE
 ```
 
-Each command invokes `messages.create` once. SDK retries are zero. A `pause_turn`, output limit stop, API or local SDK error, model mismatch, missing resolved Skill pin, missing paired result, mounted-file hash mismatch, or missing script proof fails without a retry or fallback. Internal code execution can contain several steps. The evidence counts every returned server tool step. The run passes only with `stop_reason=end_turn`.
+Each command invokes `messages.create` once. SDK retries are zero. A `pause_turn`, output limit stop, method exception, model mismatch, missing resolved Skill pin, missing paired result, mounted-file hash mismatch, or missing script proof fails without a retry or fallback. Every exception escaping `messages.create` leaves provider request, completion, billing, and usage state unknown. Internal code execution can contain several steps. The evidence counts every returned server tool step. The run passes only with `stop_reason=end_turn`.
 
 The runner allows an owner-selected output cap up to 16384 and uses 16384 in this bounded example. It never increases the cap or repeats the request automatically.
 
@@ -127,7 +128,7 @@ The API response returns the actual model. The runner requires an exact match. I
 
 ## Evidence and limits
 
-Evidence contains the returned model, requested and echoed effort state, resolved Skill ID and version, container ID, usage, hashed commands, code execution step count, mounted-file hash checks, renderer marker from paired server tool result stdout, deterministic output, and proof verdict. If the response echoes an effort other than `max`, proof fails. The live checker verifies three of the four mounted files. It reads and hashes `SKILL.md` and hashes both executable Python files. It does not read or hash `references/OUTPUT_CONTRACT.md` inside the container.
+Evidence contains the effective provider base URL, request ID when the SDK exposes one, returned model, requested and echoed effort state, resolved Skill ID and version, container ID, usage, hashed commands, code execution step count, mounted-file hash checks, renderer marker from paired server tool result stdout, deterministic output hash, and proof verdict. If the response echoes an effort other than `max`, proof fails. The live checker verifies three of the four mounted files. It reads and hashes `SKILL.md` and hashes both executable Python files. It does not read or hash `references/OUTPUT_CONTRACT.md` inside the container.
 
 Evidence excludes hidden thinking, final model text, full command text, unrelated stdout, the API key, raw HTTP headers, and the raw response. It retains only the final text hash and character count. The contract accepts only records that explicitly declare they are synthetic.
 
