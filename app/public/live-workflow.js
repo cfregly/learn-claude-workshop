@@ -247,7 +247,11 @@ export function mountLiveWorkflow(host, { roleId = 'engineer' } = {}) {
   const output = node(documentRef, 'div', 'Run the live workflow to stream a draft here.', 'live-workflow-draft')
   output.dataset.state = 'empty'
   output.setAttribute('aria-live', 'polite')
-  outputSection.append(outputHeading, output)
+  const sourceNotes = node(documentRef, 'a', 'Review source notes (new tab)', 'button quiet small')
+  sourceNotes.href = '#material/source-pack'
+  sourceNotes.target = '_blank'
+  sourceNotes.rel = 'noopener noreferrer'
+  outputSection.append(outputHeading, output, sourceNotes)
 
   const traceDetails = node(documentRef, 'details', '', 'reference live-workflow-trace')
   traceDetails.open = role.id === 'engineer'
