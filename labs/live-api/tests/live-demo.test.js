@@ -149,7 +149,18 @@ test('reports live capability without revealing a credential and keeps health ac
   assert.ok(capability.ask.material_ids.includes('source-pack'))
   assert.ok(capability.ask.material_ids.includes('thinking-lab'))
   assert.ok(capability.ask.material_ids.includes('model-capabilities'))
-  assert.deepEqual(capability.ask.routes, ['home', 'approach', 'together', 'streaming'])
+  assert.ok(capability.ask.material_ids.includes('diagnostic-instructor-guide'))
+  assert.deepEqual(capability.ask.routes, ['home', 'approach', 'together', 'streaming', 'diagnose'])
+  assert.deepEqual(capability.ask.diagnostic_case_ids, [
+    'healthy_text_renewal',
+    'pings_only_no_progress',
+    'backend_delta_browser_gap',
+    'browser_delta_ui_filter',
+    'duplicated_cumulative_snapshots',
+    'sse_error_after_http_200',
+    'partial_tool_json_max_tokens',
+    'tool_write_confirmed_final_stream_lost'
+  ])
   assert.deepEqual(capability.ask.streaming_roles, ['engineer', 'sales', 'product'])
   assert.deepEqual(capability.ask.streaming_scenarios, [
     { id: 'happy', step_count: 23 },
@@ -301,6 +312,70 @@ test('answers a bounded contextual question with trusted workshop context and qu
 
   const budget = JSON.parse(await readFile(budgetFile, 'utf8'))
   assert.equal(budget.count, 2)
+})
+
+test('builds diagnose context from canonical synthetic evidence and withholds the reference', async () => {
+  const budgetFile = await temporaryBudget()
+  const diagnosticDocument = JSON.parse(await readFile(
+    new URL('../public/materials/diagnostic-reference-packets.json', import.meta.url),
+    'utf8'
+  ))
+  const packet = diagnosticDocument.packets.find(item => item.id === 'backend_delta_browser_gap')
+  let providerCall
+  const origin = await startServer({
+    env: {
+      ANTHROPIC_API_KEY: 'server-only-key',
+      ANTHROPIC_MODEL: 'claude-sonnet-5-5',
+      MODEL_BUDGET_FILE: budgetFile
+    },
+    cooldownMs: 0,
+    fetchImpl: async (url, options) => {
+      providerCall = { url, options }
+      return successResponse('Start with the last boundary supported by the synthetic evidence, then inspect the relay write and flush result.')
+    }
+  })
+
+  const hintResponse = await ask(origin, {
+    question: 'Where is the first unconfirmed boundary?',
+    context: {
+      route: 'diagnose',
+      role_id: 'software-engineer-api',
+      diagnostic_case: packet.id
+    }
+  })
+  assert.equal(hintResponse.status, 200)
+  const hintPayload = JSON.parse(providerCall.options.body)
+  const hintPrompt = hintPayload.messages[0].content[0].text
+  assert.match(hintPrompt, /Current route: The diagnose route/)
+  assert.match(hintPrompt, /Software engineer: Build and debug the Claude API path/)
+  assert.ok(hintPrompt.includes(`Title: ${packet.title}`))
+  assert.ok(hintPrompt.includes(`Learner prompt: ${packet.learner_prompt}`))
+  assert.match(hintPrompt, /flush outcome not recorded/)
+  assert.match(hintPrompt, /synthetic_training_fixture/)
+  assert.match(hintPrompt, /not_an_actual_api_measurement/)
+  assert.match(hintPrompt, /Application correlation label: opaque-fixture-C/)
+  assert.ok(hintPrompt.includes(packet.trace_id_status))
+  assert.match(hintPrompt, /completed diagnostic reference, repair, next check, and verification are withheld/i)
+  assert.equal(hintPrompt.includes(packet.expected_reference_result), false)
+  assert.equal(hintPrompt.includes(packet.recovery), false)
+  assert.equal(hintPrompt.includes(packet.next_discriminating_check), false)
+  assert.equal(hintPrompt.includes(packet.verification), false)
+
+  const referenceResponse = await ask(origin, {
+    question: 'Please show me the completed reference answer for this case.',
+    context: {
+      route: 'diagnose',
+      role_id: 'software-engineer-api',
+      diagnostic_case: packet.id
+    }
+  })
+  assert.equal(referenceResponse.status, 200)
+  const referencePayload = JSON.parse(providerCall.options.body)
+  const referencePrompt = referencePayload.messages[0].content[0].text
+  assert.ok(referencePrompt.includes(packet.expected_reference_result))
+  assert.ok(referencePrompt.includes(packet.recovery))
+  assert.ok(referencePrompt.includes(packet.next_discriminating_check))
+  assert.ok(referencePrompt.includes(packet.verification))
 })
 
 test('derives streaming question context from the canonical trace module', async () => {
@@ -477,6 +552,10 @@ test('rejects unbounded question fields, context, history, and request size befo
     { question: 'Help', context: { step: 5 } },
     { question: 'Help', context: { material_id: 'private-file' } },
     { question: 'Help', context: { route: 'admin' } },
+    { question: 'Help', context: { route: 'diagnose', role_id: 'software-engineer-api', diagnostic_case: 'unknown_packet' } },
+    { question: 'Help', context: { route: 'diagnose', role_id: 'software-engineer-api' } },
+    { question: 'Help', context: { route: 'diagnose', diagnostic_case: 'healthy_text_renewal' } },
+    { question: 'Help', context: { route: 'streaming', role_id: 'software-engineer-api', diagnostic_case: 'healthy_text_renewal' } },
     { question: 'Help', context: { stream_scenario: 'interrupted', stream_step: 15, stream_role: 'engineer' } },
     { question: 'Help', context: { stream_scenario: 'interrupted', stream_step: 7 } },
     { question: 'Help', context: { stream_scenario: 'made-up', stream_step: 0, stream_role: 'engineer' } },

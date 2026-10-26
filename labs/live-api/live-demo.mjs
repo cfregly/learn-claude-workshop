@@ -13,6 +13,8 @@ import {
 const API_URL = 'https://api.anthropic.com/v1/messages'
 const API_VERSION = '2026-10-21'
 const DEFAULT_BUDGET_FILE = '/var/lib/learn-claude-workshop-model/model-usage.json'
+const DIAGNOSTIC_PACKETS_FILE = new URL('./public/materials/diagnostic-reference-packets.json', import.meta.url)
+const DIAGNOSTIC_PACKETS_MAX_BYTES = 65_536
 const FALLBACK = {
   available: true,
   kind: 'prepared-reference',
@@ -43,6 +45,8 @@ const CASES = {
 }
 
 const MATERIAL_SUMMARIES = Object.freeze({
+  'hooks-lab': 'The direct Messages API has no general lifecycle-hook registry. Application-owned dispatch checks authenticated caller scope before execution. Claude Code and Agent SDK lifecycle hooks are separate surfaces with event- and version-specific failure behavior. Before-tool checks can affect pending dispatch. After-tool records cannot undo a committed action. HTTP middleware observes HTTP, and service webhooks are asynchronous notifications rather than synchronous tool authorization. Enterprise inference hooks are a separate governed surface. Inspect the exact selected runtime and supported failure policy, preserve downstream authorization, and reconcile confirmed actions before retry.',
+  'hook-dispatcher': 'The standard-library Python dispatcher is synthetic and offline. It checks authenticated caller account scope before source access or action, ignores model-supplied approval overrides, returns a receipt only for one committed mock write, and uses an explicit application-owned block-on-timeout policy. Its after-action logging failure leaves the saved write confirmed. This does not claim actual Claude Code or Agent SDK hook execution.',
   'renewal-skill': 'The reviewed renewal-brief SKILL.md contains when-to-use metadata and a procedure for extracting source-bound facts, preserving unknown approvals and conflicts, proposing internal actions with named owners, and requiring human review. It is procedural knowledge, not changing customer memory, permission, or proof of execution. The API Skill IDs in the guide are synthetic placeholders.',
   'supporting-features': 'These are prepared optional extensions to the same renewal workflow, not observed execution. Native document citations expose supporting passages, not guaranteed truth. Native citations and output_config.format need separate stages. Schema validity does not prove facts, permissions, or a completed write. Prompt caching needs an eligible exact prefix, a model-specific minimum, observed cache read tokens, and total workflow cost. Messages requests are stateless. Application-owned memory needs tenant isolation, provenance, freshness, consent, and deletion. Pin reviewed Skills versions with compatible code execution. PTC is an advanced read-only multi-account comparison with authorized bounded tools, source IDs, equivalent results, actual usage, and elapsed time. An advisor gives model advice, never human approval. A compatible standalone count_tokens request estimates input, not future output, billing, or a cache hit. Code-execution and Skills requests need actual Messages usage rather than an unsupported full-request count.',
   source: 'The Northstar source pack contains four fictional records. CRM supplies the January 31, 2027 renewal and account owner Maya Chen. The call note records an SSO question, an ownerless security follow-up, and a discussed discount whose approval is not recorded. Support case 4821 is open. Weekly active users changed from 78 to 64.',
@@ -57,14 +61,16 @@ const MATERIAL_SUMMARIES = Object.freeze({
   'incomplete-response': 'The incomplete-response activity shows why visible prose is not proof of completion. Preserve partial text and the stop reason, withhold downstream action, inspect source coverage, and continue only through an explicit reviewed step.',
   'streaming-lab': 'The streaming lab reconstructs text only from typed text deltas and stays incomplete until the terminal message_stop event. An error may arrive after HTTP 200 and after visible text, so partial output must not trigger an external action.',
   'thinking-lab': 'Thinking capability and thinking behavior depend on the selected model. Effort changes how much the model thinks, while the output budget is the ceiling and thinking tokens count toward it. Omitting thinking from the displayed response does not save the thinking-token cost. Model progress narration is text, not evidence that an external action ran. When a tool turn continues, required thinking blocks and their signatures must be passed back unchanged.',
-  'model-capabilities': 'The prepared model-capability snapshot was observed on October 25, 2026. It is read-only course material, not live provider, account, entitlement, or availability state. In that snapshot, Sonnet 5.5 supports adaptive thinking and between_tools. It does not support disabled or enabled thinking. Opus 5.5 supports only adaptive thinking among those four modes. Capability still does not predict the amount of thinking a particular request will use.'
+  'model-capabilities': 'The prepared model-capability snapshot was observed on October 25, 2026. It is read-only course material, not live provider, account, entitlement, or availability state. In that snapshot, Sonnet 5.5 supports adaptive thinking and between_tools. It does not support disabled or enabled thinking. Opus 5.5 supports only adaptive thinking among those four modes. Capability still does not predict the amount of thinking a particular request will use.',
+  'diagnostic-instructor-guide': 'The instructor guide uses eight fixed synthetic packets to trace direct Claude API streaming across the API transport, backend parser and relay, browser network path, UI adapter, and client tool boundary. It keeps observed evidence separate from a completed reference, identifies the first unconfirmed boundary, and uses opaque correlation labels only to join one synthetic trace.'
 })
 
 const ROUTE_SUMMARIES = Object.freeze({
   home: 'The home route helps a learner choose a role and introduces the shared fictional Northstar account.',
   approach: 'The approach route compares how the same workflow changes across audiences, activities, and evidence of learning.',
   together: 'The together route splits business and technical learners for a short activity, then rejoins them for teach-back and a readiness decision.',
-  streaming: 'The streaming route focuses on typed events, partial output, terminal events, stop reasons, and safe failure handling.'
+  streaming: 'The streaming route focuses on typed events, partial output, terminal events, stop reasons, and safe failure handling.',
+  diagnose: 'The diagnose route follows one fixed synthetic packet across API transport, backend relay, browser, UI, and client tool boundaries. It uses observed evidence to find the first unconfirmed boundary before proposing a repair.'
 })
 
 const STEP_SUMMARIES = Object.freeze([
@@ -227,6 +233,73 @@ async function readJsonBody(request, maximumBytes) {
   }
 }
 
+function diagnosticText(value, maximum) {
+  return typeof value === 'string' && value.length > 0 && value.length <= maximum ? value : null
+}
+
+function normalizeDiagnosticEvidence(value) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 20) return null
+  const evidence = []
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return null
+    const timestamp = diagnosticText(item.timestamp, 120)
+    const component = diagnosticText(item.component, 120)
+    const event = diagnosticText(item.event, 2_000)
+    const excerptStatus = item.excerpt_status === undefined ? null : diagnosticText(item.excerpt_status, 500)
+    if (!timestamp || !component || !event || (item.excerpt_status !== undefined && !excerptStatus)) return null
+    evidence.push({
+      timestamp,
+      component,
+      event,
+      ...(excerptStatus ? { excerpt_status: excerptStatus } : {})
+    })
+  }
+  return evidence
+}
+
+async function readDiagnosticCatalog() {
+  const raw = await readFile(DIAGNOSTIC_PACKETS_FILE, 'utf8')
+  if (Buffer.byteLength(raw, 'utf8') > DIAGNOSTIC_PACKETS_MAX_BYTES) throw new Error('diagnostic_catalog_too_large')
+  const document = JSON.parse(raw)
+  if (!document || typeof document !== 'object' || Array.isArray(document)) throw new Error('diagnostic_catalog_invalid')
+  if (!document.artifact || typeof document.artifact !== 'object' || Array.isArray(document.artifact)) throw new Error('diagnostic_catalog_invalid')
+  if (!Array.isArray(document.packets) || document.packets.length !== 8) throw new Error('diagnostic_catalog_invalid')
+
+  const artifact = {
+    evidence_class: diagnosticText(document.artifact.evidence_class, 120),
+    measurement_status: diagnosticText(document.artifact.measurement_status, 120),
+    disclaimer: diagnosticText(document.artifact.disclaimer, 1_000)
+  }
+  if (!artifact.evidence_class || !artifact.measurement_status || !artifact.disclaimer) throw new Error('diagnostic_catalog_invalid')
+
+  const packets = new Map()
+  for (const packet of document.packets) {
+    if (!packet || typeof packet !== 'object' || Array.isArray(packet)) throw new Error('diagnostic_catalog_invalid')
+    const id = diagnosticText(packet.id, 100)
+    const evidence = normalizeDiagnosticEvidence(packet.observed_evidence)
+    const normalized = {
+      id,
+      title: diagnosticText(packet.title, 300),
+      learner_prompt: diagnosticText(packet.learner_prompt, 1_500),
+      observed_evidence: evidence,
+      synthetic: packet.synthetic === true,
+      measurement_status: diagnosticText(packet.measurement_status, 120),
+      app_trace_id: diagnosticText(packet.app_trace_id, 200),
+      trace_id_status: diagnosticText(packet.trace_id_status, 600),
+      expected_reference_result: diagnosticText(packet.expected_reference_result, 4_000),
+      recovery: diagnosticText(packet.recovery, 4_000),
+      next_discriminating_check: diagnosticText(packet.next_discriminating_check, 4_000),
+      verification: diagnosticText(packet.verification, 4_000)
+    }
+    if (!id || !/^[a-z0-9_]+$/.test(id) || packets.has(id)) throw new Error('diagnostic_catalog_invalid')
+    if (!normalized.title || !normalized.learner_prompt || !normalized.observed_evidence || !normalized.synthetic) throw new Error('diagnostic_catalog_invalid')
+    if (!normalized.measurement_status || !normalized.app_trace_id || !normalized.trace_id_status) throw new Error('diagnostic_catalog_invalid')
+    if (!normalized.expected_reference_result || !normalized.recovery || !normalized.next_discriminating_check || !normalized.verification) throw new Error('diagnostic_catalog_invalid')
+    packets.set(id, normalized)
+  }
+  return { artifact, packets, caseIds: [...packets.keys()] }
+}
+
 function validateSelection(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const keys = Object.keys(value).sort()
@@ -235,7 +308,7 @@ function validateSelection(value) {
   return { roleId: value.role_id, caseId: value.case_id }
 }
 
-function validateAsk(value) {
+function validateAsk(value, diagnosticCatalog = null) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const topKeys = Object.keys(value).sort()
   const requiredKeys = value.history === undefined ? ['context', 'question'] : ['context', 'history', 'question']
@@ -244,12 +317,19 @@ function validateAsk(value) {
   if (!value.context || typeof value.context !== 'object' || Array.isArray(value.context)) return null
 
   const contextKeys = Object.keys(value.context).sort()
-  const allowedContextKeys = ['material_id', 'role_id', 'route', 'step', 'stream_role', 'stream_scenario', 'stream_step']
+  const allowedContextKeys = ['diagnostic_case', 'material_id', 'role_id', 'route', 'step', 'stream_role', 'stream_scenario', 'stream_step']
   if (contextKeys.some(key => !allowedContextKeys.includes(key))) return null
   if (value.context.role_id !== undefined && !Object.hasOwn(ROLE_CONFIG, value.context.role_id)) return null
   if (value.context.step !== undefined && (!Number.isInteger(value.context.step) || value.context.step < 0 || value.context.step > 4)) return null
   if (value.context.material_id !== undefined && !Object.hasOwn(MATERIAL_SUMMARIES, value.context.material_id)) return null
   if (value.context.route !== undefined && !Object.hasOwn(ROUTE_SUMMARIES, value.context.route)) return null
+  const hasDiagnosticContext = value.context.route === 'diagnose' || value.context.diagnostic_case !== undefined
+  if (hasDiagnosticContext && (
+    value.context.route !== 'diagnose' ||
+    value.context.role_id === undefined ||
+    value.context.diagnostic_case === undefined
+  )) return null
+  if (value.context.diagnostic_case !== undefined && !diagnosticCatalog?.packets.has(value.context.diagnostic_case)) return null
   const streamScenario = value.context.stream_scenario === undefined
     ? null
     : STREAMING_LAB_SCENARIOS.find(scenario => scenario.id === value.context.stream_scenario)
@@ -282,7 +362,11 @@ function validateAsk(value) {
   return {
     question: value.question.trim(),
     context: { ...value.context },
-    history: normalizedHistory
+    history: normalizedHistory,
+    diagnosticPacket: value.context.diagnostic_case === undefined
+      ? null
+      : diagnosticCatalog.packets.get(value.context.diagnostic_case),
+    diagnosticArtifact: value.context.diagnostic_case === undefined ? null : diagnosticCatalog.artifact
   }
 }
 
@@ -340,7 +424,38 @@ function trustedStreamingContext(context) {
   ].filter(Boolean).join('\n')
 }
 
-function trustedAskContext(context, includeReference) {
+function trustedDiagnosticContext(packet, artifact, includeReference) {
+  if (!packet || !artifact) return null
+  const sections = [
+    'Trusted synthetic diagnostic case:',
+    `Case ID: ${packet.id}`,
+    `Title: ${packet.title}`,
+    `Learner prompt: ${packet.learner_prompt}`,
+    `Synthetic labels: ${JSON.stringify({
+      evidence_class: artifact.evidence_class,
+      artifact_measurement_status: artifact.measurement_status,
+      packet_synthetic: packet.synthetic,
+      packet_measurement_status: packet.measurement_status
+    })}`,
+    `Synthetic evidence notice: ${artifact.disclaimer}`,
+    `Application correlation label: ${packet.app_trace_id}`,
+    `Correlation identity meaning: ${packet.trace_id_status}`,
+    `Observed evidence: ${JSON.stringify(packet.observed_evidence)}`
+  ]
+  if (includeReference) {
+    sections.push(
+      `Completed diagnostic reference requested by the learner: ${packet.expected_reference_result}`,
+      `Prepared recovery: ${packet.recovery}`,
+      `Next discriminating check: ${packet.next_discriminating_check}`,
+      `Verification: ${packet.verification}`
+    )
+  } else {
+    sections.push('The completed diagnostic reference, repair, next check, and verification are withheld. Use only the observed evidence to give a small hint.')
+  }
+  return sections.join('\n')
+}
+
+function trustedAskContext(context, includeReference, diagnosticPacket, diagnosticArtifact) {
   const sections = [
     `Northstar synthetic records:\n${BASE_RECORDS.join('\n')}`
   ]
@@ -362,6 +477,8 @@ function trustedAskContext(context, includeReference) {
   if (context.route) sections.push(`Current route: ${ROUTE_SUMMARIES[context.route]}`)
   const streamingContext = trustedStreamingContext(context)
   if (streamingContext) sections.push(streamingContext)
+  const diagnosticContext = trustedDiagnosticContext(diagnosticPacket, diagnosticArtifact, includeReference)
+  if (diagnosticContext) sections.push(diagnosticContext)
   return sections.join('\n\n')
 }
 
@@ -384,7 +501,7 @@ function buildAskPayload(model, ask) {
       role: 'user',
       content: [{
         type: 'text',
-        text: `TRUSTED_WORKSHOP_CONTEXT\n${trustedAskContext(ask.context, explicitlyRequestsReference(ask.question))}\n\nUNTRUSTED_LEARNER_INPUT_JSON\n${learnerInput}`
+        text: `TRUSTED_WORKSHOP_CONTEXT\n${trustedAskContext(ask.context, explicitlyRequestsReference(ask.question), ask.diagnosticPacket, ask.diagnosticArtifact)}\n\nUNTRUSTED_LEARNER_INPUT_JSON\n${learnerInput}`
       }]
     }]
   }
@@ -531,6 +648,12 @@ export function createLiveDemo(options = {}) {
   async function capabilities() {
     let reason = configured ? 'ready' : 'not_configured'
     let remainingCalls = null
+    let diagnosticCaseIds = []
+    try {
+      diagnosticCaseIds = (await readDiagnosticCatalog()).caseIds
+    } catch {
+      diagnosticCaseIds = []
+    }
     if (configured) {
       try {
         const record = await budgetSnapshot()
@@ -570,6 +693,7 @@ export function createLiveDemo(options = {}) {
           step_count: scenario.steps.length
         })),
         streaming_roles: Object.keys(STREAMING_LAB_ROLES),
+        diagnostic_case_ids: diagnosticCaseIds,
         limits: ASK_LIMITS
       },
       fallback: FALLBACK
@@ -795,7 +919,22 @@ export function createLiveDemo(options = {}) {
 
     const parsed = await parsePostRequest(request, ASK_LIMITS.request_bytes, 'bounded workshop question')
     if (parsed.result) return parsed.result
-    const ask = validateAsk(parsed.value)
+    let diagnosticCatalog = null
+    if (parsed.value?.context?.diagnostic_case !== undefined) {
+      try {
+        diagnosticCatalog = await readDiagnosticCatalog()
+      } catch {
+        return {
+          statusCode: 503,
+          body: {
+            status: 'error',
+            code: 'diagnostic_context_unavailable',
+            message: 'The prepared diagnostic packet cannot be read safely. Use the visible packet while a facilitator checks the workshop files.'
+          }
+        }
+      }
+    }
+    const ask = validateAsk(parsed.value, diagnosticCatalog)
     if (!ask) {
       return {
         statusCode: 400,

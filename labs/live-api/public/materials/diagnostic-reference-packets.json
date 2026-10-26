@@ -1,0 +1,358 @@
+{
+  "artifact": {
+    "title": "Synthetic diagnostic reference packets for direct Claude API response streaming",
+    "evidence_class": "synthetic_training_fixture",
+    "measurement_status": "not_an_actual_api_measurement",
+    "scope": "Direct Claude API SSE through a backend relay to a browser UI.",
+    "disclaimer": "Every timestamp, event, identifier, signature, result, and failure in this file is synthetic. No Claude API call, browser session, credential, network request, or paid operation produced this evidence.",
+    "protocol_notes": [
+      "Relative timestamps are fictional and show ordering only.",
+      "An observed excerpt is marked incomplete unless it includes the terminal events needed for the stated conclusion.",
+      "A content block index is a stream position. A tool_use.id is the identifier used to associate a later tool result. They are not interchangeable.",
+      "Opaque correlation signatures are teaching labels. They are not API-valid request IDs, tool IDs, or idempotency keys.",
+      "Only the healthy packet claims a complete end-to-end reference sequence. Other packets show bounded excerpts or explicit failure states."
+    ],
+    "no_paid_call_required": true,
+    "protocol_note": "Evidence entries naming content_block_delta, ping, message_delta, or message_stop describe parsed SSE events, not network chunks. Buffer across network reads and parse complete SSE frames before interpreting event names and JSON payloads. One read can split an event or contain several events."
+  },
+  "packets": [
+    {
+      "id": "healthy_text_renewal",
+      "title": "Healthy text stream reconstructs Renewal",
+      "synthetic": true,
+      "measurement_status": "not_an_actual_api_measurement",
+      "learner_prompt": "Trace the text Ren plus ewal from the API stream through the backend, browser, and UI. State what proves completion.",
+      "observed_evidence": [
+        {
+          "timestamp": "synthetic:T+000ms",
+          "component": "api_transport",
+          "event": "HTTP 200 followed by message_start",
+          "excerpt_status": "complete synthetic reference sequence begins"
+        },
+        {
+          "timestamp": "synthetic:T+004ms",
+          "component": "backend_parser",
+          "event": "content_block_start index=0 content_block.type=text"
+        },
+        {
+          "timestamp": "synthetic:T+009ms",
+          "component": "backend_parser",
+          "event": "content_block_delta index=0 delta.type=text_delta text=Ren"
+        },
+        {
+          "timestamp": "synthetic:T+014ms",
+          "component": "backend_parser",
+          "event": "content_block_delta index=0 delta.type=text_delta text=ewal"
+        },
+        {
+          "timestamp": "synthetic:T+018ms",
+          "component": "backend_relay",
+          "event": "forwards the two text deltas under opaque-fixture-A"
+        },
+        {
+          "timestamp": "synthetic:T+023ms",
+          "component": "browser_network",
+          "event": "receives Ren then ewal in order"
+        },
+        {
+          "timestamp": "synthetic:T+027ms",
+          "component": "ui_reducer",
+          "event": "appends each delta once for block index 0 and renders Renewal"
+        },
+        {
+          "timestamp": "synthetic:T+032ms",
+          "component": "api_transport",
+          "event": "content_block_stop index=0, then message_delta stop_reason=end_turn, then message_stop",
+          "excerpt_status": "complete synthetic reference sequence ends"
+        }
+      ],
+      "last_confirmed_boundary": "The UI rendered Renewal and the stream ended with message_stop.",
+      "next_discriminating_check": "Compare the backend delta list, browser delta list, and rendered text under opaque-fixture-A.",
+      "expected_reference_result": "The visible text is exactly Renewal. Ren and ewal each appear once. message_stop establishes a protocol ending. In this text-only fixture, end_turn and the expected visible content support normal answer completion. No business action is implied.",
+      "recovery": "No recovery is needed. If the strings differ, stop at the first component whose output differs from its input.",
+      "verification": "Confirm one ordered append per text_delta, content_block_stop for index 0, end_turn, and message_stop.",
+      "optional_changed_case": "Swap the delta arrival order. The learner should detect an ordering fault rather than repair the word by guessing.",
+      "no_paid_call_required": true,
+      "app_trace_id": "opaque-fixture-A",
+      "trace_id_status": "Synthetic application correlation label. Not an Anthropic request ID, thinking signature, tool ID, or business idempotency key."
+    },
+    {
+      "id": "pings_only_no_progress",
+      "title": "Pings show connection activity, not answer progress",
+      "synthetic": true,
+      "measurement_status": "not_an_actual_api_measurement",
+      "learner_prompt": "The backend receives three ping events and no content. What may the UI claim, and what check comes next?",
+      "observed_evidence": [
+        {
+          "timestamp": "synthetic:T+000ms",
+          "component": "api_transport",
+          "event": "HTTP 200 followed by message_start"
+        },
+        {
+          "timestamp": "synthetic:T+500ms",
+          "component": "backend_parser",
+          "event": "ping"
+        },
+        {
+          "timestamp": "synthetic:T+1500ms",
+          "component": "backend_parser",
+          "event": "ping"
+        },
+        {
+          "timestamp": "synthetic:T+2500ms",
+          "component": "backend_parser",
+          "event": "ping",
+          "excerpt_status": "incomplete observed excerpt, no content delta or terminal event"
+        }
+      ],
+      "last_confirmed_boundary": "The backend connection was active at the last ping. No answer content or completion was confirmed.",
+      "next_discriminating_check": "Inspect the last complete event, active content block if any, and thinking display configuration. Continue to the next non-ping event within the overall deadline. Pings alone cannot establish which model work is happening.",
+      "expected_reference_result": "The UI may say connected or waiting. It must not claim percent complete, token progress, business progress, or a finished answer.",
+      "recovery": "At the bounded deadline, close the attempt and offer a new text-only request. Keep the original attempt labeled incomplete.",
+      "verification": "A recovered attempt needs content evidence and its own terminal result. More pings do not satisfy verification.",
+      "optional_changed_case": "Replace the third ping with one text_delta. The learner may then claim content arrival, but still not completion.",
+      "no_paid_call_required": true,
+      "app_trace_id": "opaque-fixture-B",
+      "trace_id_status": "Synthetic application correlation label. Not an Anthropic request ID, thinking signature, tool ID, or business idempotency key."
+    },
+    {
+      "id": "backend_delta_browser_gap",
+      "title": "Backend receives text but the browser receives no event",
+      "synthetic": true,
+      "measurement_status": "not_an_actual_api_measurement",
+      "learner_prompt": "Find the first broken boundary when the backend has a text delta but the browser has only response headers.",
+      "observed_evidence": [
+        {
+          "timestamp": "synthetic:T+000ms",
+          "component": "api_transport",
+          "event": "HTTP 200 followed by message_start and content_block_start index=0"
+        },
+        {
+          "timestamp": "synthetic:T+008ms",
+          "component": "backend_parser",
+          "event": "content_block_delta index=0 delta.type=text_delta text=Renewal"
+        },
+        {
+          "timestamp": "synthetic:T+011ms",
+          "component": "backend_relay",
+          "event": "stream write attempted under opaque-fixture-C, flush outcome not recorded"
+        },
+        {
+          "timestamp": "synthetic:T+1000ms",
+          "component": "browser_network",
+          "event": "response headers present, zero stream events observed",
+          "excerpt_status": "incomplete observed excerpt"
+        }
+      ],
+      "last_confirmed_boundary": "The backend parser received Renewal. Delivery beyond the backend write attempt is unconfirmed.",
+      "next_discriminating_check": "Instrument the backend write completion and flush, then check proxy buffering before changing the UI.",
+      "expected_reference_result": "The backend buffer contains Renewal. The browser and UI contain no confirmed text.",
+      "recovery": "Repair the relay framing or flush path, then replay the local fixture through the backend and browser path.",
+      "verification": "Under one opaque correlation label, confirm the browser receives the same text_delta and the UI renders Renewal once.",
+      "optional_changed_case": "Let the browser receive the delta while the UI stays empty. That changes the diagnosis to healthy network delivery with a client-state fault.",
+      "no_paid_call_required": true,
+      "app_trace_id": "opaque-fixture-C",
+      "trace_id_status": "Synthetic application correlation label. Not an Anthropic request ID, thinking signature, tool ID, or business idempotency key."
+    },
+    {
+      "id": "browser_delta_ui_filter",
+      "title": "Browser receives correct deltas but the UI filters them",
+      "synthetic": true,
+      "measurement_status": "not_an_actual_api_measurement",
+      "learner_prompt": "The browser records Ren and ewal, but the visible answer is blank. Identify the next check and the smallest repair.",
+      "observed_evidence": [
+        {
+          "timestamp": "synthetic:T+012ms",
+          "component": "browser_network",
+          "event": "content_block_delta index=0 delta.type=text_delta text=Ren"
+        },
+        {
+          "timestamp": "synthetic:T+018ms",
+          "component": "browser_network",
+          "event": "content_block_delta index=0 delta.type=text_delta text=ewal"
+        },
+        {
+          "timestamp": "synthetic:T+020ms",
+          "component": "ui_event_adapter",
+          "event": "discards both events because content_block_delta is absent from its accepted event map"
+        },
+        {
+          "timestamp": "synthetic:T+026ms",
+          "component": "ui_view",
+          "event": "visible text remains empty",
+          "excerpt_status": "bounded failure excerpt"
+        }
+      ],
+      "last_confirmed_boundary": "The browser received both correct deltas. The UI event adapter rejected them.",
+      "next_discriminating_check": "Trace one browser event through the adapter and reducer with its event type, delta type, and block index intact.",
+      "expected_reference_result": "The reducer should accept text_delta content for index 0 and render Renewal.",
+      "recovery": "Add the documented event mapping and append only text_delta text to the matching block state.",
+      "verification": "Replay the local two-delta fixture and confirm two reducer actions, one visible Renewal, and no rendering for non-text deltas.",
+      "optional_changed_case": "If text appears and then disappears when index 1 starts, check whether block state is being replaced instead of stored by index.",
+      "no_paid_call_required": true,
+      "app_trace_id": "opaque-fixture-D",
+      "trace_id_status": "Synthetic application correlation label. Not an Anthropic request ID, thinking signature, tool ID, or business idempotency key."
+    },
+    {
+      "id": "duplicated_cumulative_snapshots",
+      "title": "Cumulative snapshots are appended as if they were deltas",
+      "synthetic": true,
+      "measurement_status": "not_an_actual_api_measurement",
+      "learner_prompt": "The UI shows RenRenewal. Decide which component violated the chosen relay contract and how to verify the repair.",
+      "observed_evidence": [
+        {
+          "timestamp": "synthetic:T+006ms",
+          "component": "backend_parser",
+          "event": "receives text deltas Ren then ewal for block index 0"
+        },
+        {
+          "timestamp": "synthetic:T+010ms",
+          "component": "backend_relay",
+          "event": "emits application snapshots value=Ren then value=Renewal with mode=cumulative_snapshot"
+        },
+        {
+          "timestamp": "synthetic:T+015ms",
+          "component": "browser_network",
+          "event": "receives both cumulative snapshots"
+        },
+        {
+          "timestamp": "synthetic:T+019ms",
+          "component": "ui_reducer",
+          "event": "appends both snapshots and renders RenRenewal",
+          "excerpt_status": "bounded failure excerpt"
+        }
+      ],
+      "last_confirmed_boundary": "The browser received cumulative snapshots. The reducer treated them as incremental deltas.",
+      "next_discriminating_check": "Read the relay schema used by both sides and determine whether the field means delta or replacement snapshot.",
+      "expected_reference_result": "The visible block text is exactly Renewal.",
+      "recovery": "Choose one contract. Either relay true deltas and append them, or relay cumulative snapshots and replace the block value. Version the field so the modes cannot be confused.",
+      "verification": "Replay Ren plus ewal and assert the final block is Renewal with no duplicated prefix.",
+      "optional_changed_case": "If the relay emits true deltas and one frame is replayed, test frame replay handling instead of applying the snapshot fix.",
+      "no_paid_call_required": true,
+      "app_trace_id": "opaque-fixture-E",
+      "trace_id_status": "Synthetic application correlation label. Not an Anthropic request ID, thinking signature, tool ID, or business idempotency key."
+    },
+    {
+      "id": "sse_error_after_http_200",
+      "title": "An SSE error follows a successful HTTP status",
+      "synthetic": true,
+      "measurement_status": "not_an_actual_api_measurement",
+      "learner_prompt": "The request returned HTTP 200 and one text fragment, then emitted an SSE error. Classify the result and choose a safe recovery.",
+      "observed_evidence": [
+        {
+          "timestamp": "synthetic:T+000ms",
+          "component": "api_transport",
+          "event": "HTTP 200 followed by message_start and content_block_start index=0"
+        },
+        {
+          "timestamp": "synthetic:T+010ms",
+          "component": "backend_parser",
+          "event": "content_block_delta index=0 delta.type=text_delta text=Partial answer"
+        },
+        {
+          "timestamp": "synthetic:T+025ms",
+          "component": "api_transport",
+          "event": "error event error.type=overloaded_error message=synthetic stream interruption"
+        },
+        {
+          "timestamp": "synthetic:T+030ms",
+          "component": "backend_parser",
+          "event": "no content_block_stop, message_delta, or message_stop observed",
+          "excerpt_status": "terminal error state with an incomplete answer"
+        }
+      ],
+      "last_confirmed_boundary": "Partial answer reached the backend before the SSE error. A complete message was not confirmed.",
+      "next_discriminating_check": "Inspect the streamed event type and error class. Do not infer success from the initial HTTP status.",
+      "expected_reference_result": "Preserve Partial answer only as incomplete output. Do not present it as the final answer.",
+      "recovery": "For this text-only synthetic case, offer a bounded retry for the transient error and keep the failed attempt visible as incomplete.",
+      "verification": "Treat the retry as complete only after its own content blocks close and message_stop arrives.",
+      "optional_changed_case": "Change the error to a non-retryable request error. The learner should surface the error and avoid automatic retry.",
+      "no_paid_call_required": true,
+      "app_trace_id": "opaque-fixture-F",
+      "trace_id_status": "Synthetic application correlation label. Not an Anthropic request ID, thinking signature, tool ID, or business idempotency key."
+    },
+    {
+      "id": "partial_tool_json_max_tokens",
+      "title": "Tool JSON is partial when generation reaches max_tokens",
+      "synthetic": true,
+      "measurement_status": "not_an_actual_api_measurement",
+      "learner_prompt": "The stream starts a client tool block, buffers partial JSON, and reports max_tokens. Decide whether the tool may run.",
+      "observed_evidence": [
+        {
+          "timestamp": "synthetic:T+004ms",
+          "component": "backend_parser",
+          "event": "content_block_start index=2 content_block.type=tool_use content_block.id=opaque-tool-ref-A name=update_account"
+        },
+        {
+          "timestamp": "synthetic:T+012ms",
+          "component": "backend_parser",
+          "event": "content_block_delta index=2 delta.type=input_json_delta partial_json={\"account_id\":\"A12\",\"renew"
+        },
+        {
+          "timestamp": "synthetic:T+021ms",
+          "component": "backend_parser",
+          "event": "message_delta stop_reason=max_tokens"
+        },
+        {
+          "timestamp": "synthetic:T+024ms",
+          "component": "client_tool_dispatcher",
+          "event": "authoritative dispatcher rejected incomplete arguments before dispatch, dispatch_count=0",
+          "excerpt_status": "intentionally incomplete observed excerpt, not a claimed complete protocol sequence"
+        }
+      ],
+      "last_confirmed_boundary": "The client buffered incomplete JSON for block index 2 and mapped that block to tool_use.id opaque-tool-ref-A. No tool execution was confirmed.",
+      "next_discriminating_check": "Require the tool block to close, parse the full buffer as JSON, validate the schema and permission, then inspect the stop reason before dispatch.",
+      "expected_reference_result": "Do not parse each fragment as complete JSON. Do not dispatch update_account from this excerpt. Never use block index 2 as the tool result identifier.",
+      "recovery": "Request a fresh generation with enough output budget. Since no dispatch occurred, there is no side effect to reconcile.",
+      "verification": "On a fresh successful attempt, dispatch only after complete valid arguments and policy approval. Pair its tool_result.tool_use_id with that new attempt's actual tool_use.id. Preserve the failed attempt separately. Never use block index 2 as the tool identifier.",
+      "optional_changed_case": "Provide complete JSON but deny the requested account in policy. The correct result is still no dispatch.",
+      "no_paid_call_required": true,
+      "app_trace_id": "opaque-fixture-G",
+      "trace_id_status": "Synthetic application correlation label. Not an Anthropic request ID, thinking signature, tool ID, or business idempotency key."
+    },
+    {
+      "id": "tool_write_confirmed_final_stream_lost",
+      "title": "A client tool write is confirmed but the final model stream is lost",
+      "synthetic": true,
+      "measurement_status": "not_an_actual_api_measurement",
+      "learner_prompt": "The client tool write has an authoritative receipt, but the follow-up model stream disconnects. Recover without writing twice.",
+      "observed_evidence": [
+        {
+          "timestamp": "synthetic:T+010ms",
+          "component": "backend_parser",
+          "event": "complete tool block at index=4 with tool_use.id=opaque-tool-ref-B and valid synthetic arguments"
+        },
+        {
+          "timestamp": "synthetic:T+018ms",
+          "component": "client_tool_dispatcher",
+          "event": "dispatches one write under opaque-operation-key-B after validation"
+        },
+        {
+          "timestamp": "synthetic:T+030ms",
+          "component": "system_of_record",
+          "event": "authoritative receipt says applied_once=true revision=17 for opaque-operation-key-B"
+        },
+        {
+          "timestamp": "synthetic:T+044ms",
+          "component": "client_tool_result",
+          "event": "tool_result.tool_use_id=opaque-tool-ref-B carries the confirmed receipt"
+        },
+        {
+          "timestamp": "synthetic:T+060ms",
+          "component": "browser_network",
+          "event": "follow-up response returned HTTP 200, then the connection closed before a final message_stop was observed",
+          "excerpt_status": "incomplete final model response after a confirmed side effect"
+        }
+      ],
+      "last_confirmed_boundary": "The external write is confirmed once at revision 17. The final model answer is unconfirmed.",
+      "next_discriminating_check": "Re-read the system of record with opaque-operation-key-B and inspect the stored tool receipt before any retry decision.",
+      "expected_reference_result": "Report one confirmed write and one lost final explanation. Do not redispatch the write because the final stream is missing.",
+      "recovery": "Reuse the confirmed receipt. Start a new final-explanation turn with the write tool disabled, or enforce dispatch deduplication by the stored operation key. Keep the lost response marked incomplete.",
+      "verification": "Confirm the system of record still shows one write. Preserve the original tool request and result pairing in history. Complete a new explanation without redispatching the write, and inspect its end_turn and message_stop before marking the explanation complete.",
+      "optional_changed_case": "If the system of record has no matching receipt, mark the write outcome unknown and reconcile the operation before deciding whether a retry is safe.",
+      "no_paid_call_required": true,
+      "app_trace_id": "opaque-fixture-H",
+      "trace_id_status": "Synthetic application correlation label. Not an Anthropic request ID, thinking signature, tool ID, or business idempotency key."
+    }
+  ]
+}

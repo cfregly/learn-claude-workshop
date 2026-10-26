@@ -10,6 +10,8 @@ The live site's networked behavior is limited to bounded, text-only Claude Messa
 
 The streaming and tool-use trace, thinking lesson, model-capability snapshot, and optional feature guide are prepared course materials. The examples teach citations, structured outputs, prompt caching, app-owned memory, Skills, read-only programmatic tool calling, the advanced advisor pattern, and input token counting. They do not show that those features ran on the live site.
 
+Open the [diagnostics workshop](https://learn.fluxcapacitor.dev/#diagnose) to trace eight fixed synthetic cases across transport, backend, browser, UI, and client tool boundaries. The route replays prepared events and application observations. Its labels are not a provider wire capture, API measurement, or customer action.
+
 ## Start here
 
 1. Read the [Northstar source pack](docs/northstar-source-pack.md).
@@ -27,6 +29,8 @@ The streaming and tool-use trace, thinking lesson, model-capability snapshot, an
 - [Claude for Work activity](docs/claude-for-work.md)
 - [Facilitator guide](docs/facilitator-guide.md)
 - [Incomplete response lesson](docs/incomplete-response.md)
+- [Diagnostic exercise instructor guide](docs/diagnostic-instructor-guide.md)
+- [Application hooks lab](docs/hooks-lab.md)
 - [Security and regulated workflow review](docs/security-workshop.md)
 - [Streaming and tool-use trace](docs/streaming-lab.md)
 - [Thinking lesson](docs/thinking-lab.md)
@@ -38,6 +42,9 @@ The streaming and tool-use trace, thinking lesson, model-capability snapshot, an
 - [Offline API trace notebook](labs/api-trace.ipynb)
 - [Direct Claude API client with offline default](labs/claude_api_demo.py)
 - [Synthetic evaluation fixtures](labs/source-fixtures.json)
+- [Synthetic diagnostic replay](labs/diagnostics/diagnostics-lab.js)
+- [Diagnostic reference packets](labs/diagnostics/diagnostic-reference-packets.json)
+- [Offline hook dispatcher](labs/hook_dispatcher.py)
 - [Standalone live API lab](labs/live-api/README.md)
 - [Claude Code boundary lab](labs/northstar-renewals/README.md)
 - [Versioned renewal-brief Skill](labs/skills/renewal-brief/SKILL.md)
