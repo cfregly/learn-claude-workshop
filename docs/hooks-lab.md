@@ -36,9 +36,11 @@ A receipt appears only after the synthetic store commits. The allowed case delib
 
 Use three status cards with business learners:
 
-- **Supported waiting:** the before check is pending, denied, or timed out. No write receipt exists.
-- **Draft ready:** the model proposed an action, but the application has not committed it.
+- **Supported waiting:** the before check is pending. No write receipt exists.
+- **Draft ready:** a complete draft is available for source review. No account action is implied.
 - **Action confirmed:** the synthetic system of record returned a commit receipt. An explanation or audit log can still be missing.
+
+A denied or timed-out before check is marked blocked under this mock's policy. A named owner resolves it before a new attempt.
 
 These labels keep a plausible model statement separate from an authorized action and its evidence.
 
