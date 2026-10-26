@@ -17,17 +17,20 @@ export const preparedIntegration = Object.freeze({
 
 function el(doc,tag,text='',className='') {const n=doc.createElement(tag);n.textContent=text;if(className)n.className=className;return n}
 
-export function mountSharedIntegration(host,{role='engineer',githubRef='main'}={}) {
+export function mountSharedIntegration(host,{role='engineer',githubRef='main',showRoleLinks=true,showModeHint=true,showLearningCheck=true}={}) {
   if(!host)return
   const doc=host.ownerDocument,engineer=role==='engineer'
   host.className='shared-integration'
   host.replaceChildren()
   host.append(el(doc,'h2','The same Northstar API workflow'))
-  const choices=el(doc,'nav','','bridge-roles actions');choices.setAttribute('aria-label','View the same integration for another audience')
-  for(const [id,label,selected] of [['software-engineer-api','Engineer',engineer],['account-executive','Account executive',!engineer]]) {
-    const a=el(doc,'a',label,'button secondary');a.href=`#path/${id}/2`;if(selected)a.setAttribute('aria-current','page');choices.append(a)
+  if(showRoleLinks) {
+    const choices=el(doc,'nav','','bridge-roles actions');choices.setAttribute('aria-label','View the same integration for another audience')
+    for(const [id,label,selected] of [['software-engineer-api','Engineer',engineer],['account-executive','Account executive',!engineer]]) {
+      const a=el(doc,'a',label,'button secondary');a.href=`#path/${id}/2`;if(selected)a.setAttribute('aria-current','page');choices.append(a)
+    }
+    host.append(choices)
   }
-  host.append(choices,el(doc,'p','Prepared lineage: '+preparedIntegration.lineage_id,'small muted'))
+  host.append(el(doc,'p','Prepared lineage: '+preparedIntegration.lineage_id,'small muted'))
   host.append(el(doc,'p',engineer?'Inspect the application access check, backend credential, request, typed response, and recovery path. The account executive reviews this same draft.':'The application performs the integration. You review its draft against the supplied records, identify unknowns, and choose the next action.'))
   host.append(el(doc,'p','The application checks Northstar access before loading records. Its backend holds the Claude credential. Neither the credential nor a finished response approves a customer claim.','notice'))
   const output=el(doc,engineer?'details':'section','','shared-draft')
@@ -42,7 +45,7 @@ export function mountSharedIntegration(host,{role='engineer',githubRef='main'}={
   const map=el(doc,'details','','reference integration-map-shell');if(engineer)map.open=true
   map.append(el(doc,'summary','Trace access, credential, request, response, tools, delivery, and review'))
   const mapHost=el(doc,'div','','integration-map-host');mapHost.dataset.role=role;map.append(mapHost);host.append(map)
-  host.append(el(doc,'p',engineer?'Learning check: explain one access boundary, one response field, and the next check when the visible result is incomplete.':'Learning check: name one supported customer claim, one unknown, and the person who owns the next action.','small'))
-  const work=el(doc,'p','Prepared reference for both roles. The optional live call returns text only; streaming and tool use are simulated in the labs.','small muted');host.append(work)
+  if(showLearningCheck)host.append(el(doc,'p',engineer?'Learning check: explain one access boundary, one response field, and the next check when the visible result is incomplete.':'Learning check: name one supported customer claim, one unknown, and the person who owns the next action.','small'))
+  if(showModeHint)host.append(el(doc,'p','Prepared synthetic reference. This lab simulates the request, typed response, and review boundary without a model or tool call.','small muted'))
   const source=el(doc,'a','Open this shared reference in GitHub','small');source.href=`https://github.com/cfregly/learn-claude-workshop/blob/${githubRef}/labs/integration/shared-integration.js`;source.target='_blank';source.rel='noopener noreferrer';host.append(source)
 }

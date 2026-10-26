@@ -174,15 +174,17 @@ function capabilityReady(data, role) {
   )
 }
 
-export function mountLiveWorkflow(host, { roleId = 'engineer' } = {}) {
+export function mountLiveWorkflow(host, { roleId = 'engineer', showRoleLinks = true, showRoleGoal = true, fallbackLabel = 'Replay' } = {}) {
   if (!host) return null
   const documentRef = host.ownerDocument || document
   const role = normalizeRole(roleId)
+  const fallback = firstLine(fallbackLabel, 'Replay', 60)
   let destroyed = false
   let available = false
   let running = false
   let activeController = null
   let abortReason = ''
+  let runSettled = false
   let runNumber = 0
   let runTimeout = null
   const capabilityController = new AbortController()
@@ -282,7 +284,10 @@ export function mountLiveWorkflow(host, { roleId = 'engineer' } = {}) {
   codeLink.href = '#material/live-stream-tool-code'
   resources.append(guideLink, codeLink)
 
-  host.append(roleLinks, heading, intro, goal, boundary, controls, activity, outputSection, traceDetails, resources)
+  if (showRoleLinks) host.append(roleLinks)
+  host.append(heading, intro)
+  if (showRoleGoal) host.append(goal)
+  host.append(boundary, controls, activity, outputSection, traceDetails, resources)
 
   function current(number) {
     return !destroyed && number === runNumber && host.isConnected
@@ -308,6 +313,7 @@ export function mountLiveWorkflow(host, { roleId = 'engineer' } = {}) {
   }
 
   function resetRun() {
+    runSettled = false
     traceValues.trace.textContent = 'Not received'
     traceValues.tool.textContent = 'Not received'
     traceValues.sources.textContent = 'Not received'
@@ -376,10 +382,11 @@ export function mountLiveWorkflow(host, { roleId = 'engineer' } = {}) {
 
     function incomplete(message) {
       state.terminal = 'incomplete'
+      runSettled = true
       showPartial(state.outputText)
       setReadiness(state.outputText ? 'Incomplete draft' : 'Not ready', 'incomplete')
       setActivity('Workflow incomplete', message, 'error')
-      runStatus.textContent = 'Review is blocked. Replay remains available.'
+      runStatus.textContent = `Review is blocked. ${fallback} remains available.`
     }
 
     function handleEvent(name, payload) {
@@ -452,6 +459,7 @@ export function mountLiveWorkflow(host, { roleId = 'engineer' } = {}) {
           return
         }
         state.terminal = 'complete'
+        runSettled = true
         output.replaceChildren()
         output.className = 'live-workflow-draft live-workflow-markdown-output'
         output.dataset.state = 'complete'
@@ -482,7 +490,7 @@ export function mountLiveWorkflow(host, { roleId = 'engineer' } = {}) {
         if (!current(number)) return
         setReadiness('Not ready', 'incomplete')
         setActivity('Run did not start', message, 'error')
-        runStatus.textContent = 'No live draft was created. Use Replay or try again later.'
+        runStatus.textContent = `No live draft was created. Use ${fallback} or try again later.`
         return
       }
       if (!response.body || !String(response.headers.get('content-type') || '').toLowerCase().includes('text/event-stream')) {
@@ -517,7 +525,9 @@ export function mountLiveWorkflow(host, { roleId = 'engineer' } = {}) {
       if (error?.name === 'AbortError') {
         const message = abortReason === 'timeout'
           ? 'The live run exceeded its time limit. Partial text is preserved.'
-          : 'Run cancelled. Partial text is preserved.'
+          : abortReason === 'mode-change'
+            ? 'Live demo hidden. Run cancelled. Partial text is preserved.'
+            : 'Run cancelled. Partial text is preserved.'
         incomplete(message)
       } else {
         incomplete(firstLine(error?.message, 'The live stream could not be read. Partial text is preserved.'))
@@ -527,16 +537,22 @@ export function mountLiveWorkflow(host, { roleId = 'engineer' } = {}) {
     }
   }
 
+  function cancel(reason = 'cancelled') {
+    if (destroyed || !running || runSettled || !activeController) return false
+    abortReason = reason
+    runButton.disabled = true
+    runButton.textContent = 'Cancelling…'
+    runStatus.textContent = 'Cancelling this run. No retry will start.'
+    activeController.abort()
+    return true
+  }
+
   runButton.addEventListener('click', () => {
     if (!running) {
       runWorkflow()
       return
     }
-    abortReason = 'cancelled'
-    runButton.disabled = true
-    runButton.textContent = 'Cancelling…'
-    runStatus.textContent = 'Cancelling this run. No retry will start.'
-    activeController?.abort()
+    cancel()
   })
 
   fetch('/api/demo', {
@@ -550,15 +566,16 @@ export function mountLiveWorkflow(host, { roleId = 'engineer' } = {}) {
     runButton.disabled = !available
     runStatus.textContent = available
       ? 'Live is available. Each run makes two bounded API calls.'
-      : 'Live is unavailable. Use Replay.'
+      : `Live is unavailable. Use ${fallback}.`
   }).catch(() => {
     if (destroyed) return
     available = false
     runButton.disabled = true
-    runStatus.textContent = 'Live is unavailable. Use Replay.'
+    runStatus.textContent = `Live is unavailable. Use ${fallback}.`
   })
 
   return {
+    cancel,
     destroy() {
       if (destroyed) return
       destroyed = true

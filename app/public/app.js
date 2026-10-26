@@ -1,13 +1,13 @@
 import { mountIntegrationMap } from './integration-map.js?v=review-1'
-import { mountSharedIntegration } from './shared-integration.js?v=review-1'
+import { mountSharedIntegration } from './shared-integration.js?v=20261026-final-review'
 import { paths } from './content.js?v=20261025-rename'
 import { renderMaterial } from './materials-viewer.js?v=20261025-rename'
 import { mountLiveDemo } from './live-demo.js?v=20261025-rename'
 import { initAskClaude } from './ask-claude.js?v=20261025-rename'
 import { observeCodeBlocks } from './code-blocks.js?v=20261025-rename'
 import { mountStreamingLab } from './streaming-lab.js?v=20261025-rename'
-import { mountLiveWorkflow } from './live-workflow.js?v=20261026-live-workflow'
-const githubRef = 'aae731b47e8d5c7f8a458c380a494ba0798af52d'
+import { mountLiveWorkflow } from './live-workflow.js?v=20261026-review-fixes'
+const githubRef = '75ba253996e7da32a9a7bdbfd3096d575b0bc3fe'
 const githubRoot = 'https://github.com/cfregly/learn-claude-workshop'
 const githubFile = path => `${githubRoot}/blob/${githubRef}/${path}`
 
@@ -34,6 +34,7 @@ let diagnosticLabHandle
 let streamingLabHandle
 let liveWorkflowHandle
 let activeStreamingMode = 'replay'
+let activeLessonDemoMode = 'prepared'
 let workflowSelection = []
 let personaCategory = paths.find(p => p.id === state.lastPath)?.category || 'Business'
 let adaptationPath = 'software-engineer-api'
@@ -102,7 +103,7 @@ function pathRows() {
 }
 function home(expanded = false) {
   main.innerHTML = `<div class="page"><section class="home-intro"><div class="intro-copy"><h1>One account.<br>Your kind of work.</h1><p>Choose your role and work through Northstar’s renewal. Leave with a useful artifact and the evidence behind it.</p>
-  <section id="paths" class="section-anchor persona-picker" aria-label="Choose your role"><h2>Where do you work?</h2><div class="persona-groups" role="group" aria-label="Type of work">${['Business','Technical','Leadership'].map(g=>`<button data-persona-group="${g}" aria-pressed="${personaCategory===g}">${g}</button>`).join('')}</div><div class="persona-list" id="persona-list">${personaChoices()}</div><p class="small muted persona-note">Choose a role to open its path. You can switch at any time.</p></section><div class="intro-meta">Self-paced or facilitated · References and challenges included</div><a class="approach-link small" href="#path/software-engineer-api/2">See the shared API demo for engineers and account executives &#8594;</a></div>
+  <section id="paths" class="section-anchor persona-picker" aria-label="Choose your role"><h2>Where do you work?</h2><div class="persona-groups" role="group" aria-label="Type of work">${['Business','Technical','Leadership'].map(g=>`<button data-persona-group="${g}" aria-pressed="${personaCategory===g}">${g}</button>`).join('')}</div><div class="persona-list" id="persona-list">${personaChoices()}</div><p class="small muted persona-note">Choose a role to open its path. You can switch at any time.</p></section><div class="intro-meta">Self-paced or facilitated · References and challenges included</div><a class="approach-link small" href="#path/software-engineer-api/2">Compare the Engineer and Account Executive views</a></div>
   <aside class="account-sheet" aria-label="Shared fictional account"><h2>Meet Northstar Freight</h2><p class="small muted">Your shared example across every path.</p><dl><div><dt>Account owner</dt><dd>Maya Chen</dd></div><div><dt>Renewal</dt><dd>Jan 31, 2027</dd></div><div><dt>Weekly active users</dt><dd>78 &#8594; 64</dd></div><div><dt>Support case 4821</dt><dd>Open</dd></div><div><dt>12% discount</dt><dd><span class="status">Approval unknown</span></dd></div></dl><p class="small muted">All records are synthetic. The same facts and unknowns follow you through the workshop.</p><a class="small" href="#material/source-pack">Read the source notes</a></aside></section>
   <section class="group-band"><div><h2>Different routes. A clear return point.</h2><p>In four minutes, engineers trace the integration while business users check the brief. Everyone rejoins to explain their evidence.</p></div><a href="#together" class="button">Open the group activity <span aria-hidden="true">&#8594;</span></a></section>
   ${facilitator('<p>Ask learners to choose the route that fits their learning need. Start with the shared workflow check, announce the return time, and use the teach-back to decide whether the room is ready to continue.</p><a href="#material/facilitator">Read the facilitator guide</a>')}</div>`
@@ -155,6 +156,21 @@ function preparedResponseTrace(path) {
   const request={model:'ACCOUNT_ENABLED_MODEL',max_tokens:90,system:'Use only supplied facts. Include sources, unknowns, actions, and owners.',messages:[{role:'user',content:[{type:'text',text:'[CRM] Renewal January 31, 2027. Owner Maya Chen. [CALL] 12 percent discussed, approval not recorded. [SUPPORT] Case 4821 open. [USAGE] 64 active users, previously 78. Cause unknown.'}]}]}
   const response={id:'msg_northstar_partial',type:'message',content:[{type:'text',text:'Northstar renews January 31, 2027 [CRM]. Maya Chen owns the account [CRM]. Case 4821 is'}],stop_reason:'max_tokens'}
   return `<details class="reference"><summary>Inspect the annotated request and typed response</summary><p class="small muted">Prepared synthetic trace. This is separate from the optional live request.</p><h3>Request</h3><pre class="code" data-language="json"><code>${esc(JSON.stringify(request,null,2))}</code></pre><h3>Typed response</h3><pre class="code" data-language="json"><code>${esc(JSON.stringify(response,null,2))}</code></pre><p>The configured output limit stopped generation. Preserve the partial draft and mark it incomplete. A fresh response must finish generation, contain the required sections, and pass a source check before use.</p><a href="#material/incomplete-response">Compare the engineer trace with the sales manager brief</a></details>`
+}
+function hasInlineLiveDemo(path) {
+  return ['software-engineer-api','account-executive'].includes(path?.id)
+}
+function inlineLiveRole(path) {
+  return path.id==='account-executive'?'sales':'engineer'
+}
+function lessonStepLink(path, step) {
+  return step===2&&hasInlineLiveDemo(path)&&activeLessonDemoMode==='live'?`${link(path,step)}/live`:link(path,step)
+}
+function lessonDemoSwitcher(path, mode) {
+  const live=mode==='live'
+  const suffix=live?'/live':''
+  const roles=[['software-engineer-api','Engineer'],['account-executive','Account Executive']]
+  return `<section class="lesson-demo-switcher" aria-label="Demonstration choices"><nav class="bridge-roles actions lesson-demo-roles" aria-label="View this demonstration for another audience">${roles.map(([id,label])=>`<a class="button secondary" data-demo-role="${id}" href="#path/${id}/2${suffix}" ${path.id===id?'aria-current="page"':''}>${label}</a>`).join('')}</nav><div class="streaming-mode lesson-demo-mode"><div class="streaming-mode-choices" role="group" aria-label="Demonstration mode"><button class="button secondary" type="button" data-lesson-demo-mode="prepared" aria-pressed="${!live}">Prepared example</button><button class="button secondary" type="button" data-lesson-demo-mode="live" aria-pressed="${live}">Live demo</button></div><p class="small muted">Prepared example needs no API call. In Live demo, Run live workflow starts the request. Switching back cancels an unfinished run. <a href="#streaming/${inlineLiveRole(path)}">Open the detailed Replay</a>.</p></div></section>`
 }
 function teachingApproach() {
   document.title = 'How the workshop adapts | Flux Capacitor'
@@ -210,33 +226,61 @@ function diagnosticsLab() {
   }).catch(()=>{if(host.isConnected)host.textContent='The case could not load. Return to the activity and open its worked example.'})
 }
 
-function accountExecutiveApiDemo(path) {
-  return `<h1>Review the API draft</h1><div id="shared-integration"></div><p><a class="button secondary" href="#streaming/sales">Follow the request in Replay or Live</a></p><details class="reference"><summary>Try an alternate Claude for Work exercise</summary>${workStarter(path)}</details>${reference(path)}`
+function accountExecutiveApiDemo(path, mode) {
+  return `<h1>Review the API draft</h1>${lessonDemoSwitcher(path,mode)}<div data-lesson-demo-pane="prepared" ${mode==='live'?'hidden':''}><div id="shared-integration"></div><details class="reference"><summary>Try an alternate Claude for Work exercise</summary>${workStarter(path)}</details></div><div data-lesson-demo-pane="live" ${mode==='live'?'':'hidden'}><div id="lesson-live-workflow"></div></div><section class="spaced"><h2>Test your understanding</h2><p>Before you continue or switch roles, name one supported customer claim, one unknown, and the owner of the next action.</p></section>${reference(path)}`
 }
-function engineerApiDemo(path) {
-  return `<h1>Trace one request. Check one boundary.</h1><div id="shared-integration"></div><section class="spaced"><h2>Test your understanding</h2><p>Find the first unconfirmed boundary in a prepared failure trace. Test a display repair, then explain what proves it worked.</p><div class="actions"><a class="button" href="#diagnose">Diagnose and repair the display</a><a class="button secondary" href="#streaming/engineer">Follow the request in Replay or Live</a></div></section><details class="reference"><summary>Compare an incomplete response</summary><h3>Inspect this first</h3><p>${esc(path.demo.before)}</p><h3>Compare with the reference</h3><p>${esc(path.demo.after)}</p>${preparedResponseTrace(path)}<a href="#material/incomplete-response">Open the annotated failure and fresh check</a></details>${reference(path)}<p class="small"><a href="#material/supporting-features">Optional extensions: sources, schemas, memory, Skills, and cost</a></p>`
+function engineerApiDemo(path, mode) {
+  return `<h1>Trace one request. Check one boundary.</h1>${lessonDemoSwitcher(path,mode)}<div data-lesson-demo-pane="prepared" ${mode==='live'?'hidden':''}><div id="shared-integration"></div><details class="reference"><summary>Compare an incomplete response</summary><h3>Inspect this first</h3><p>${esc(path.demo.before)}</p><h3>Compare with the reference</h3><p>${esc(path.demo.after)}</p>${preparedResponseTrace(path)}<a href="#material/incomplete-response">Open the annotated failure and fresh check</a></details><p class="small"><a href="#material/supporting-features">Optional extensions: sources, schemas, memory, Skills, and cost</a></p></div><div data-lesson-demo-pane="live" ${mode==='live'?'':'hidden'}><div id="lesson-live-workflow"></div><section class="notice lesson-demo-evidence"><strong>Evidence to bring forward</strong><br>Before you continue or switch roles, capture the matched tool ID, stop reason, and next check. Open the event trace to inspect and copy the trace and provider request IDs.</section></div><section class="spaced"><h2>Test your understanding</h2><p>Identify the first unconfirmed boundary. Then diagnose a failed variation and explain what proves the display recovered.</p><div class="actions"><a class="button" href="#diagnose">Diagnose and repair the display</a></div></section>${reference(path)}`
 }
 function mountIntegrationArtifacts(path) {
   const role=path.id==='account-executive'?'business':'engineer'
   const shared=document.querySelector('#shared-integration')
-  if(shared)mountSharedIntegration(shared,{role,githubRef})
+  if(shared)mountSharedIntegration(shared,{role,githubRef,showRoleLinks:false,showModeHint:false,showLearningCheck:false})
   document.querySelectorAll('.integration-map-host').forEach(host=>mountIntegrationMap(host,{githubRef,role:host.dataset.role||role}))
 }
 
-function lessonBody(path, step) {
+function mountLessonDemo(path, initialMode) {
+  const liveHost=document.querySelector('#lesson-live-workflow')
+  const panes=[...document.querySelectorAll('[data-lesson-demo-pane]')]
+  const buttons=[...document.querySelectorAll('[data-lesson-demo-mode]')]
+  const roleLinks=[...document.querySelectorAll('[data-demo-role]')]
+  const currentStepLinks=[...document.querySelectorAll('.lesson-nav [aria-current="step"]')]
+  if(!liveHost||!panes.length||!buttons.length)return
+
+  const ensureLive=()=>{
+    if(!liveWorkflowHandle)liveWorkflowHandle=mountLiveWorkflow(liveHost,{roleId:inlineLiveRole(path),showRoleLinks:false,showRoleGoal:false,fallbackLabel:'Prepared example'})
+  }
+  const selectMode=(requested,{replaceRoute=false,force=false}={})=>{
+    const mode=requested==='live'?'live':'prepared'
+    if(!force&&mode===activeLessonDemoMode)return
+    if(!force&&activeLessonDemoMode==='live'&&mode==='prepared')liveWorkflowHandle?.cancel('mode-change')
+    activeLessonDemoMode=mode
+    panes.forEach(pane=>{pane.hidden=pane.dataset.lessonDemoPane!==mode})
+    buttons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.lessonDemoMode===mode)))
+    roleLinks.forEach(link=>{link.href=`#path/${link.dataset.demoRole}/2${mode==='live'?'/live':''}`})
+    currentStepLinks.forEach(link=>link.setAttribute('href',`#path/${path.id}/2${mode==='live'?'/live':''}`))
+    if(mode==='live')ensureLive()
+    if(replaceRoute){history.replaceState(history.state,'',`#path/${path.id}/2${mode==='live'?'/live':''}`);questionGuide.refreshContext()}
+  }
+  buttons.forEach(button=>button.addEventListener('click',()=>selectMode(button.dataset.lessonDemoMode,{replaceRoute:true})))
+  selectMode(initialMode,{force:true})
+}
+
+function lessonBody(path, step, demoMode='prepared') {
   const w = work(path)
   if (step === 0) return `<h1>${esc(path.task ? roleName(path) : path.title)}</h1><h2>Your familiar task</h2>${paragraphs(path.task)}<div class="notice"><strong>What you will leave with</strong><br>${esc(path.exercise.prompt)}</div>${commonGround()}${facilitator(`<p>${esc(path.facilitator.checkpoint)}</p><ol>${path.facilitator.agenda.map(a=>`<li><span class="agenda-time">${esc(a.minutes)} min</span> ${esc(a.label)}</li>`).join('')}</ol><p><strong>If someone is blocked:</strong> ${esc(path.facilitator.recovery)}</p>`)}`
   if (step === 1) return `<h1>How it works</h1>${paragraphs(path.explanation)}<h2>Keep the workflow in view</h2><ol><li>Select the approved account records.</li><li>Ask Claude for a draft using those records.</li><li>Check facts, unknowns, and proposed actions.</li><li>Use the reviewed output in the existing process.</li></ol><p class="muted small">The application controls access to account records. A model response never grants permission or approves a discount.</p>${reference(path)}`
-  if (step === 2 && path.id==='account-executive') return accountExecutiveApiDemo(path)
-  if (step === 2 && path.id==='software-engineer-api') return engineerApiDemo(path)
+  if (step === 2 && path.id==='account-executive') return accountExecutiveApiDemo(path,demoMode)
+  if (step === 2 && path.id==='software-engineer-api') return engineerApiDemo(path,demoMode)
   if (step === 2) return `<h1>${esc(path.demo.title)}</h1><p class="muted small">Start with this prepared example, then try the workflow below.</p>${path.id==='software-engineer-api'?'<div id="shared-integration"></div><p><a href="#streaming/engineer">Follow the same request and tool cycle</a></p><h2 class="spaced">Then diagnose a failed variation</h2>':''}<div class="comparison"><section><h3>Inspect this first</h3><div class="answer-text">${esc(path.demo.before)}</div></section><section><h3>Compare with the reference</h3><div class="answer-text">${esc(path.demo.after)}</div></section></div><div class="notice"><strong>What to notice</strong><br>${esc(path.demo.notice)}</div>${path.category!=='Technical'&&path.id!=='engineering-manager-claude-code'?workStarter(path):''}${['software-engineer-api','sales-manager'].includes(path.id)?'<p><a href="#material/incomplete-response">Inspect the unfinished-response example and fresh learning check</a></p>':''}${preparedResponseTrace(path)}${path.category==='Technical'?'<section class="spaced"><h2>Follow the request</h2><p>See how streaming text, tool input, and application checks fit the same Northstar workflow.</p><div class="actions"><a class="button secondary" href="#streaming/engineer">Follow streaming and tool use</a><a class="button quiet" href="#diagnose">Diagnose a stalled draft</a></div></section>':''}${liveExample(path)}${path.category!=='Technical'?'<p class="small spaced"><a href="#diagnose">When a draft stalls, check what the team can say</a></p>':''}<p class="small spaced"><a href="#material/supporting-features">Optional: sources, schemas, memory, Skills, and cost</a></p>${reference(path)}`
   if (step === 3) return `<h1>Make the work useful</h1><h2>Why it matters</h2>${paragraphs(path.value)}<h2>Your activity</h2><p>${esc(path.exercise.prompt)}</p>${path.exercise.reviewDraft?`<section class="notice"><h3>Practice variation: draft to review</h3><p class="small muted">The records are unchanged. This draft contains a claim that needs correcting.</p><p>${esc(path.exercise.reviewDraft)}</p></section>`:''}<div class="activity-materials">${taskMaterials(path)}</div><label class="exercise-label" for="draft">Your working artifact</label><textarea id="draft" class="draft" data-path="${path.id}" spellcheck="true">${esc(w.draft ?? path.exercise.template)}</textarea><div class="draft-meta"><span id="save-status">${storageAvailable?'Saved in this browser as you write.':'Browser storage is unavailable. Download your work before leaving.'}</span><span>Use synthetic records only</span></div><div class="actions"><button class="button secondary" data-action="download-work" data-path="${path.id}">Download my work</button><button class="button quiet" data-action="reset-template" data-path="${path.id}">Restore template</button></div><h3 class="spaced">Check your artifact</h3><ul class="checklist">${path.exercise.checks.map((c,i)=>`<li><label><input type="checkbox" data-artifact-check="${i}" data-path="${path.id}" ${w.checks?.includes(i)?'checked':''}>${esc(c)}</label></li>`).join('')}</ul>${reference(path)}${facilitator(`<p>Give the main activity to everyone. Offer the reference version immediately to anyone blocked. Faster learners test the optional changed assumption. Ask participants to explain their evidence at the checkpoint.</p>`)}`
   return `<h1>Show what you learned</h1>${w.checkPassed?`<div class="completion"><h2>Learning check complete</h2><p>You answered every question correctly. Keep your working artifact and explain one choice to a colleague.</p></div>`:''}<p>Choose an answer for each question. Use the feedback to revisit any missing concept.</p><form id="quiz-form" data-path="${path.id}">${path.quiz.map((q,i)=>`<fieldset class="quiz"><legend>${i+1}. ${esc(q.question)}</legend>${q.options.map((o,j)=>`<label class="quiz-option"><input type="radio" name="q${i}" value="${j}" required ${w.answers?.[i]===j?'checked':''}><span>${esc(o)}</span></label>`).join('')}<div id="quiz-feedback-${i}" aria-live="polite"></div></fieldset>`).join('')}<div class="actions"><button class="button" type="submit">Check my understanding</button><button class="button secondary" type="button" data-action="download-work" data-path="${path.id}">Download my work</button></div><div id="quiz-summary" aria-live="polite"></div></form>${facilitator(`<p>${esc(path.facilitator.checkpoint)}</p><p>Ask what evidence supports the answer. Continue when learners can explain the decision and its boundary. Otherwise return to the relevant reference and check a new example.</p>`)}`
 }
-function renderLesson(id, rawStep) {
+function renderLesson(id, rawStep, requestedMode) {
   const path = paths.find(p => p.id === id)
   if (!path) { main.innerHTML = '<div class="page"><h1>Choose a learning path</h1><p>This path is unavailable.</p><a class="button" href="#paths">View all paths</a></div>'; return }
   const step = Math.min(4, Math.max(0, Number(rawStep)||0))
+  activeLessonDemoMode=step===2&&hasInlineLiveDemo(path)&&requestedMode==='live'?'live':'prepared'
   state.lastPath = path.id
   state.lastLesson = link(path, step)
   personaCategory = path.category
@@ -244,11 +288,11 @@ function renderLesson(id, rawStep) {
   save()
   const w = work(path)
   document.title = `${roleName(path)} · ${steps[step]} | Learn Claude workshop`
-  main.innerHTML = `<div class="lesson-layout ${step>0?'compact-account':''}"><aside class="lesson-nav"><a class="back-link" href="#paths">&#8592; Change learning path</a><h2>${esc(roleName(path))}</h2><span class="path-meta">${path.minutes} min · ${esc(path.surface)}</span><ol class="step-list">${steps.map((s,i)=>`<li><a class="step-link ${w.steps.includes(i)?'done':''}" href="${link(path,i)}" ${i===step?'aria-current="step"':''}><span class="step-number">${w.steps.includes(i)?'&#10003;':i+1}</span>${s}</a></li>`).join('')}</ol><div class="progress-text">${progressLabel(w)}</div><progress class="progress-track" max="5" value="${w.steps.length}" aria-label="Completed steps">${w.steps.length} of 5</progress><nav class="lesson-mobile-nav mobile-steps" aria-label="Workshop steps">${steps.map((s,i)=>`<a href="${link(path,i)}" ${step===i?'aria-current="step"':''} aria-label="${i+1} ${esc(s)}"><span>${i+1}</span>${['Task','Explain','Demo','Practice','Check'][i]}</a>`).join('')}</nav></aside>
-  <article class="lesson-main">${lessonBody(path,step)}<div class="lesson-toolbar">${step?`<a class="button secondary" href="${link(path,step-1)}">&#8592; Back</a>`:'<span></span>'}${step<4?`<button class="button" data-action="next-step" data-path="${path.id}" data-step="${step}" ${(step===0&&!state.common)?'disabled':''}>Continue <span aria-hidden="true">&#8594;</span></button>`:`<a class="button secondary" href="#paths">Explore another path</a>`}</div>${step===0&&!state.common?'<p class="small muted">Identify the shared workflow above to continue.</p>':''}</article>
+  main.innerHTML = `<div class="lesson-layout ${step>0?'compact-account':''}"><aside class="lesson-nav"><a class="back-link" href="#paths">&#8592; Change learning path</a><h2>${esc(roleName(path))}</h2><span class="path-meta">${path.minutes} min · ${esc(path.surface)}</span><ol class="step-list">${steps.map((s,i)=>`<li><a class="step-link ${w.steps.includes(i)?'done':''}" href="${lessonStepLink(path,i)}" ${i===step?'aria-current="step"':''}><span class="step-number">${w.steps.includes(i)?'&#10003;':i+1}</span>${s}</a></li>`).join('')}</ol><div class="progress-text">${progressLabel(w)}</div><progress class="progress-track" max="5" value="${w.steps.length}" aria-label="Completed steps">${w.steps.length} of 5</progress><nav class="lesson-mobile-nav mobile-steps" aria-label="Workshop steps">${steps.map((s,i)=>`<a href="${lessonStepLink(path,i)}" ${step===i?'aria-current="step"':''} aria-label="${i+1} ${esc(s)}"><span>${i+1}</span>${['Task','Explain','Demo','Practice','Check'][i]}</a>`).join('')}</nav></aside>
+  <article class="lesson-main">${lessonBody(path,step,activeLessonDemoMode)}<div class="lesson-toolbar">${step?`<a class="button secondary" href="${link(path,step-1)}">&#8592; Back</a>`:'<span></span>'}${step<4?`<button class="button" data-action="next-step" data-path="${path.id}" data-step="${step}" ${(step===0&&!state.common)?'disabled':''}>Continue <span aria-hidden="true">&#8594;</span></button>`:`<a class="button secondary" href="#paths">Explore another path</a>`}</div>${step===0&&!state.common?'<p class="small muted">Identify the shared workflow above to continue.</p>':''}</article>
   <aside class="lesson-aside"><details ${step===0?'open':''}><summary>The shared account</summary><p class="muted">Northstar Freight is fictional. These records are the source of truth for the exercises.</p>${sourceSummary()}<a class="source-link" href="#material/source-pack">Read all source notes</a></details><details><summary>Help and reference</summary><p>Every activity has a completed reference. Open it whenever you need a way back into the lesson.</p>${taskMaterials(path)}</details><details><summary>Official documentation</summary>${path.resources.map(r=>`<a class="source-link" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.label)} &#8599;</a>`).join('')}</details><p class="small muted spaced-sm">Progress is saved in this browser. Export it from Materials when you need a copy.</p></aside></div>`
   document.querySelector('.lesson-main h1').insertAdjacentHTML('afterend',learningGoal(path))
-  if (step===2) {mountIntegrationArtifacts(path);mountLiveDemo(document.querySelector('#live-demo'),path)}
+  if (step===2) {mountIntegrationArtifacts(path);if(hasInlineLiveDemo(path))mountLessonDemo(path,activeLessonDemoMode);else mountLiveDemo(document.querySelector('#live-demo'),path)}
 }
 
 const traceCode = `# Excerpt from the runnable offline notebook\ndef prepare_request(employee, account_id):\n    if account_id not in employee["allowed_accounts"]:\n        raise PermissionError("Account access denied")\n    facts = approved_records[account_id]\n    return {\n        "model": "ACCOUNT_ENABLED_MODEL",\n        "max_tokens": 350,\n        "system": "Use only supplied facts. Keep unknowns visible.",\n        "messages": [{"role": "user", "content": facts}]\n    }\n\n# Access is checked BEFORE adding account facts.\nrequest = prepare_request(employee, "northstar")\nresponse = {"content": [{"type": "text",\n    "text": "12% discussed. Approval is not recorded."}],\n    "stop_reason": "end_turn"}\ntext = "".join(b["text"] for b in response["content"]\n               if b["type"] == "text")`
@@ -387,10 +431,11 @@ function render() {
   diagnosticLabHandle?.destroy();diagnosticLabHandle=null
   streamingLabHandle?.destroy();streamingLabHandle=null
   liveWorkflowHandle?.destroy();liveWorkflowHandle=null
+  activeLessonDemoMode='prepared'
   main.removeAttribute('aria-busy')
   const hash=location.hash.slice(1)
   document.title='Learn Claude workshop | Flux Capacitor'
-  if(hash.startsWith('path/')) { const [,id,step]=hash.split('/'); renderLesson(id,step) }
+  if(hash.startsWith('path/')) { const [,id,step,mode]=hash.split('/'); renderLesson(id,step,mode) }
   else if(hash==='together') groupActivity()
   else if(hash==='approach') teachingApproach()
   else if(hash==='streaming'||hash.startsWith('streaming/')) streamingLab()
@@ -506,11 +551,11 @@ const questionGuide = initAskClaude({getContext() {
   const hash=location.hash.slice(1)
   const [kind,id,rawStep]=hash.split('/')
   const path=paths.find(p=>p.id===(kind==='path'?id:state.lastPath))
-  if(kind==='path'&&path) return {context:{role_id:path.id,step:Math.min(4,Math.max(0,Number(rawStep)||0))},label:`${roleName(path)} · ${steps[Math.min(4,Math.max(0,Number(rawStep)||0))]}`,suggestions:['Explain this in simpler terms','Show me a small example','What should I inspect first if this fails?']}
+  if(kind==='path'&&path){const step=Math.min(4,Math.max(0,Number(rawStep)||0));if(step===2&&hasInlineLiveDemo(path)&&activeLessonDemoMode==='live')return {context:{route:'streaming',role_id:path.id,stream_mode:'live'},label:`${roleName(path)} · Live demo`,suggestions:['Explain this live workflow','Which trace fields prove the lookup completed?','What should I check if streaming stops?']};return {context:{role_id:path.id,step},label:`${roleName(path)} · ${steps[step]}`,suggestions:['Explain this in simpler terms','Show me a small example','What should I inspect first if this fails?']}}
   if(kind==='diagnose'){const audience=path||paths.find(p=>p.id==='software-engineer-api');return {context:{route:'diagnose',role_id:audience.id,diagnostic_case:state.diagnosticsByRole?.[audience.id]?.caseId||'healthy_text_renewal'},threadKey:state.diagnosticsByRole?.[audience.id]?.attemptId||'worked-example',label:roleName(audience)+' · '+(document.querySelector('.diagnostic-case h3')?.textContent||'Diagnosis'),suggestions:['Give me a hint about the next boundary','Which evidence would distinguish the possible causes?','What would a customer be told at this point?']}}
   if(kind==='approach'){const audience=paths.find(p=>p.id===adaptationPath);return {context:{route:'approach',role_id:audience.id},label:'Comparing '+roleName(audience),suggestions:['Why does this role need a different activity?','What evidence would show this learner is ready?','How would I adapt this for another audience?']}}
   if(kind==='material') return {context:{material_id:id==='source-pack'?'source':id,...(path?{role_id:path.id}:{})},label:`${path?roleName(path)+" · ":""}${id.replaceAll('-',' ')}`,suggestions:['Explain the main idea in this material','Walk me through one example','How does this apply to my role?']}
-  if(kind==='streaming'){const s=state.streaming||{};const scenario=s.scenarioId||'happy';const role=s.roleId||'engineer';if(activeStreamingMode==='live'){const audience=role==='sales'?'account-executive':role==='product'?'product-manager':'software-engineer-api';const label=role==='sales'?'Account executive':role==='product'?'Product':'Engineer';return {context:{route:'streaming',role_id:audience,stream_mode:'live'},label:label+' · Live Northstar workflow',suggestions:['Explain this live workflow','What proves the lookup completed?','What should I check if streaming stops?']}}const audience=role==='sales'?'sales-manager':role==='product'?'product-manager':path?.category==='Technical'?path.id:'software-engineer-api';return {context:{route:'streaming',role_id:audience,stream_scenario:scenario,stream_step:s.stepByScenario?.[scenario]||0,stream_role:role},label:role[0].toUpperCase()+role.slice(1)+' · '+scenario+' · step '+((s.stepByScenario?.[scenario]||0)+1),suggestions:['Explain the current event','What evidence permits the next application stage?','What would change if this stream stopped now?']}}
+  if(kind==='streaming'){const s=state.streaming||{};const scenario=s.scenarioId||'happy';const role=s.roleId||'engineer';if(activeStreamingMode==='live'){const audience=role==='sales'?'account-executive':role==='product'?'product-manager':'software-engineer-api';const label=role==='sales'?'Account executive':role==='product'?'Product':'Engineer';return {context:{route:'streaming',role_id:audience,stream_mode:'live'},label:label+' · Live Northstar workflow',suggestions:['Explain this live workflow','Which trace fields prove the lookup completed?','What should I check if streaming stops?']}}const audience=role==='sales'?'sales-manager':role==='product'?'product-manager':path?.category==='Technical'?path.id:'software-engineer-api';return {context:{route:'streaming',role_id:audience,stream_scenario:scenario,stream_step:s.stepByScenario?.[scenario]||0,stream_role:role},label:role[0].toUpperCase()+role.slice(1)+' · '+scenario+' · step '+((s.stepByScenario?.[scenario]||0)+1),suggestions:['Explain the current event','What evidence permits the next application stage?','What would change if this stream stopped now?']}}
   if(kind==='together')return {context:{route:'together',role_id:activeRoute==='engineer'?'software-engineer-api':path&&path.category!=='Technical'?path.id:'account-executive'},label:'Shared activity · '+(activeRoute==='engineer'?'Engineering route':'Business route'),suggestions:['What evidence should I bring to the checkpoint?','Give me a hint without solving the activity','What does the other route need to understand?']}
   if(kind==='resources')return {context:{route:'resources',...(path?{role_id:path.id}:{})},label:'Materials and learning record',suggestions:['Which reference helps me continue my activity?','How do I export my saved work?','Which examples run without an API key?']}
   return {context:{route:'home'},label:'Choose your learning path',suggestions:['Which path fits my learning need?','Explain the shared workflow','How would this work in my organization?']}
