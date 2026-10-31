@@ -12,22 +12,29 @@ The workshop uses documented Claude and MCP interfaces. The Northstar case, role
 
 ## Run the app
 
-Use Node.js 22 or later.
+Use Node.js 22 or later. Start this block in the parent directory where you want the new checkout. The app runs in a subshell, so stopping the server returns you to that parent directory.
 
 ```bash
 git clone https://github.com/cfregly/learn-claude-workshop.git
-cd learn-claude-workshop/app
-npm ci
-npm start
+(
+  cd learn-claude-workshop/app
+  npm ci
+  npm start
+)
 ```
+
+For every independent section below, start in the cloned repository root, `learn-claude-workshop/`. Use a separate terminal while the server is running.
 
 Open `http://127.0.0.1:18120`. The site, replay, and offline materials work without an API key. Live features remain unavailable until the server receives approved `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` environment settings. Keep credentials out of source files and shell history.
 
-For local live use, point the bounded usage record to a writable ignored directory before starting the server:
+For local live use, start at the repository root and point the bounded usage record to a writable ignored directory before starting the server. This subshell keeps the app working directory and environment separate from your parent shell:
 
 ```bash
-export MODEL_BUDGET_FILE="$PWD/.local/model-usage.json"
-npm start
+(
+  cd app
+  export MODEL_BUDGET_FILE="$PWD/.local/model-usage.json"
+  npm start
+)
 ```
 
 ## Replay and Live
@@ -40,7 +47,7 @@ The original text-only starter remains in [labs/claude_api_demo.py](labs/claude_
 
 ## Python streaming lab
 
-The Python lab is offline by default.
+The Python lab is offline by default. Start this independent setup block at the repository root:
 
 ```bash
 python3 -m venv .venv
@@ -49,7 +56,7 @@ python -m pip install -r requirements-live.txt
 python labs/live-stream-tool-demo.py
 ```
 
-After setting approved `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` environment values, opt into the bounded live path:
+From the repository root, with the virtual environment active and approved `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` environment values set, opt into the bounded live path:
 
 ```bash
 python labs/live-stream-tool-demo.py --live
@@ -71,21 +78,25 @@ The copies under `app/public/materials/` are the files served by the app. Their 
 
 ## Checks
 
-Run the complete app checks:
+Start at the repository root for the app checks. The subshell returns to that directory when the commands finish:
 
 ```bash
-cd app
-npm ci
-npm run check
-npm test
+(
+  cd app
+  npm ci
+  npm run check
+  npm test
+)
 ```
 
-Run the standalone backend checks:
+Start this independent block at the repository root for the standalone backend checks:
 
 ```bash
-cd labs/live-api
-npm ci
-npm test
+(
+  cd labs/live-api
+  npm ci
+  npm test
+)
 ```
 
 The JavaScript tests inject provider responses and make no paid model calls. The default Python clients use synthetic data and make no network calls.

@@ -4,16 +4,16 @@ This lab packages a real custom Skill and provides an opt-in invocation path thr
 
 No upload or provider inference was performed while building this lane. The opt-in workshop owner performs those actions with an approved workspace, credentials, budget, and private receipt directory.
 
-Status: source and offline tests only. No Skill upload or Messages call has run. The runner has not yet been checked against a recorded provider response.
+Status: the standalone Python CLI described here has offline test evidence only. No live invocation of this CLI is recorded. The separate application integration completed one synthetic native Skill run. See the [observed in-app run](../../../docs/skills-tools-example.md#observed-in-app-run) for that distinct evidence.
 
-The official pages linked below document the Skill mount path, returned container Skill fields, code execution tool version, exact model IDs, and `max` effort. This repository has not yet observed those fields in its own live receipt.
+The official pages linked below document the Skill mount path, returned container Skill fields, code execution tool version, exact model IDs, and `max` effort. The standalone CLI has not yet observed those fields in its own live receipt. The separate in-app receipt does not qualify this CLI.
 
 ## Mechanism
 
 The configured path follows the current official API shape checked October 26, 2026:
 
-1. `renewal_skill.upload` stages only the allowlisted Skill files and calls `client.skills.create`, or `client.skills.versions.create` for an explicitly named existing Skill.
-2. It records the provider-returned Skill ID, version ID, SDK version, and exact local bundle hash in a private pin receipt. Version ID formats may change, so the code preserves the returned value without inventing a prefix.
+1. `renewal_skill.upload` stages only the allowlisted Skill files and reserves the requested pin path with a pending reconciliation record before calling `client.skills.create`, or `client.skills.versions.create` for an explicitly named existing Skill.
+2. After validating the response, it replaces that record with a private pin receipt containing the provider-returned Skill ID, version ID, SDK version, and exact local bundle hash. Version ID formats may change, so the code preserves the returned value without inventing a prefix.
 3. `renewal_skill.run_live` recomputes the bundle hash and rejects any drift from the pin.
 4. It is designed to invoke `messages.create` once with the pinned custom Skill in `container.skills`, `code_execution_20260521`, and `output_config.effort=max`.
 5. It requires paired successful server tool results for reading the installed `SKILL.md`, hashing the mounted executable files, and running the bundled deterministic renderer.
@@ -70,17 +70,31 @@ From the repository root, after the MCP lane is installed:
 
 The live runner accepts only the agreed seven fields. It rejects an `expected` answer key, extra fields, a false synthetic declaration, missing access confirmation, and `demo-no-access` before any provider call. This schema check does not establish that the data is actually synthetic. It does not prove authentication or authorization. The runner records the origin as `caller_supplied_synthetic_record` because it does not bind or validate an MCP receipt.
 
+## Credential and working-directory prerequisites
+
+Both `renewal_skill.upload` and `renewal_skill.run_live` require `ANTHROPIC_API_KEY` in their process environment. A missing variable stops before a provider method invocation. Use only the workspace and budget approved for this opt-in lab. A key does not grant access to real customer records.
+
+Each independent command block below starts at the public repository root. It opens a child Bash process, prompts for the key without echoing it, exports the key only for that process and its children, then changes to the Skill directory. When the block exits, your parent shell stays at the repository root and its environment is unchanged. Do not put the key in command text, shell tracing, a source file, or the workshop site.
+
+The [live starter guide](../../../docs/live-stream-tool-demo.md#run-live-with-your-environment) explains the same terminal-input and process-scope pattern. Its live streaming command is a separate opt-in exercise, not a prerequisite to run here.
+
 ## Opt-in upload
 
-Run this only in the approved workshop workspace. Keep the pin and provider receipts outside the public repository.
+Run this only in the approved workshop workspace. Start at the repository root after the offline setup above. Keep the pin and provider receipts outside the public repository.
 
 ```bash
+bash <<'BASH'
+set -e
+read -r -s -p "Anthropic API key: " ANTHROPIC_API_KEY </dev/tty
+printf '\n'
+export ANTHROPIC_API_KEY
 mkdir -p /tmp/renewal-skill-receipts
 cd labs/skills/renewal-brief
 ../../../.venv-skills/bin/python -m renewal_skill.upload \
   --skill-root . \
   --pin-file /tmp/renewal-skill-receipts/skill-pin.json \
   --confirm-upload CREATE_OR_VERSION_WORKSPACE_SKILL
+BASH
 ```
 
 To create a new version of the same workspace Skill, add the real existing ID:
@@ -89,13 +103,28 @@ To create a new version of the same workspace Skill, add the real existing ID:
 --existing-skill-id skill_...
 ```
 
-The uploader invokes one Skills SDK method and configures SDK retries to zero. A successful response is required before it writes a success pin. If that method raises, it writes a failure receipt with provider request and usage state marked unknown. It does not persist a raw API response or credential.
+A successful upload creates `/tmp/renewal-skill-receipts/skill-pin.json` containing the actual returned Skill ID and exact version. Keep that pin for the next block.
+
+The uploader invokes one Skills SDK method and configures SDK retries to zero. It syncs saved file contents. On POSIX it also syncs the parent directory. Windows skips that directory operation, so directory-entry durability is not claimed there. If it cannot reserve the requested pin path, no upload starts. A method exception, invalid response shape, or failure to save the success pin leaves a pending or failure recovery record at that path. The uploader refuses to reuse an existing path on a later invocation.
+
+Recovery records retain validated returned ID, type, and name fields plus a request ID when available. They do not persist a raw API response or credential. After a method exception, the operation outcome and usage remain unknown even if a request ID is available. If updating the recovery record also fails, the uploader prints safe recovery data and the reserved path still blocks another upload. Save those diagnostics.
+
+### Reconcile an upload failure
+
+A pending or failure record is not a usable Skill pin. Preserve that record and the diagnostics. Inspect any actual returned Skill, version, and request IDs. Do not remove failure evidence before workspace reconciliation. Reconcile the possibly created workspace Skill or version before explicitly choosing a new private pin path or restoring a confirmed exact pin. Do not blindly delete the marker and upload again.
+
+The separate in-app route checks that its private state can be written before an upload. It reserves a separate private `<pin-file>.upload-recovery.json` blocker before invoking the upload method. A method error, invalid returned pin, or post-response pin-write failure keeps that blocker and requires reconciliation before another native run. After a response, the record retains validated returned ID, type, and name fields plus the request ID without storing the raw response. These recovery records do not change the reviewed Skill bundle or native execution pins.
 
 ## Two opt-in native Skill runs
 
-Use the same pin and MCP export for both exact models.
+Start this independent block at the repository root, with the offline environment installed, the successful upload pin present, and the MCP export already written. Use the same pin and MCP export for both exact models. The child shell stops if either command fails, so it does not silently continue after an incomplete first run. Preserve every pin, failure receipt, and evidence file if the block stops. The runner refuses an existing evidence path. After resolving the cause, run only the unfinished command with a new private evidence path. Do not delete prior evidence to rerun the block. Each opt-in attempt can incur another provider charge and must stay within the approved budget.
 
 ```bash
+bash <<'BASH'
+set -e
+read -r -s -p "Anthropic API key: " ANTHROPIC_API_KEY </dev/tty
+printf '\n'
+export ANTHROPIC_API_KEY
 cd labs/skills/renewal-brief
 ../../../.venv-skills/bin/python -m renewal_skill.run_live \
   --skill-root . \
@@ -116,6 +145,7 @@ cd labs/skills/renewal-brief
   --max-tokens 16384 \
   --evidence-file /tmp/renewal-skill-receipts/fable-5.1-max.json \
   --confirm-live RUN_ONE_NATIVE_SKILL_MESSAGE
+BASH
 ```
 
 Each command invokes `messages.create` once. SDK retries are zero. A `pause_turn`, output limit stop, method exception, model mismatch, missing resolved Skill pin, missing paired result, mounted-file hash mismatch, or missing script proof fails without a retry or fallback. Every exception escaping `messages.create` leaves provider request, completion, billing, and usage state unknown. Internal code execution can contain several steps. The evidence counts every returned server tool step. The run passes only with `stop_reason=end_turn`.

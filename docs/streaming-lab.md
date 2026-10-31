@@ -111,7 +111,7 @@ A streamed response begins with `message_start`. Its `content` array is empty. E
 2. One or more `content_block_delta` events
 3. `content_block_stop`
 
-The block `index` identifies its position in the final Message content array. In the completed reference, index 0 holds text and index 1 holds `tool_use`.
+The block `index` identifies its position in the final Message content array. In the completed reference, index 0 holds text and index 1 holds `tool_use`. The following type union covers only those blocks in this prepared replay. It is not the complete API content-block type set.
 
 ```ts
 type MessageContent = TextBlock | ToolUseBlock
@@ -244,7 +244,9 @@ The unauthorized path requests `acct_aurora`, which is absent from the allowlist
 
 ## Conversation history and matching tool IDs
 
-After a client tool result, the next request preserves the original user Message, the assistant Message containing `tool_use`, and a new user Message containing `tool_result`.
+After a client tool result, the next request preserves the earlier conversation, the assistant Message containing `tool_use`, and a new user Message containing `tool_result`. The array below is a replay-only excerpt showing the tool call and matching result. It omits the earlier user Message and assistant text for readability and is not a complete continuation request.
+
+For a real continuation, append the complete received assistant `content` unchanged, including text, thinking, or redacted-thinking blocks when present. Preserve the earlier history. Do not rebuild the assistant Message from only the `tool_use` block shown here.
 
 ```json
 [

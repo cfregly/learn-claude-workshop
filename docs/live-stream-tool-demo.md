@@ -27,7 +27,7 @@ The second request keeps all first-response blocks, including any model text bef
 
 ## Set up the optional SDK
 
-From the cloned workshop directory:
+From the public repository root:
 
 ```bash
 python3 -m venv .venv
@@ -37,13 +37,7 @@ python -m pip install -r requirements-live.txt
 
 The pinned requirement is the official Anthropic Python SDK. The starter uses `client.messages.stream(...)`, iterates raw stream events, and reads the completed Message with `get_final_message()`.
 
-Run the offline default first. In the workshop app source checkout, use:
-
-```bash
-python public/materials/live-stream-tool-demo.py
-```
-
-In the published lab bundle, the same starter is under `labs`:
+Run the offline default first. Start this independent block from the public repository root, with the virtual environment above active:
 
 ```bash
 python labs/live-stream-tool-demo.py
@@ -61,15 +55,39 @@ The default command does not import the SDK, read a credential, execute the look
 
 ## Run live with your environment
 
-Put the API key and model in your own process environment. Do not add the key to the script, a command argument, a shell history line, or the workshop site.
+Start this independent block in a terminal at the public repository root, with the virtual environment above active. Enter the exact model ID enabled for your account at the first prompt. The block rejects empty input or whitespace before asking for a key. This local format check does not verify model access or tool support, so confirm both in your account first. Bash then prompts for the key without echoing it. The key is passed to the child Python process through its environment, not through a command argument or a shell history line. Do not paste it into the script or workshop site.
 
 ```bash
-export ANTHROPIC_API_KEY="your-key-from-your-own-account"
-export ANTHROPIC_MODEL="a-model-enabled-for-your-account"
-python public/materials/live-stream-tool-demo.py --live
+bash <<'BASH'
+set -e
+read -r -p "Model ID enabled for your account: " ANTHROPIC_MODEL </dev/tty
+if [[ -z "$ANTHROPIC_MODEL" || "$ANTHROPIC_MODEL" == *[[:space:]]* ]]; then
+  printf 'Enter a nonempty model ID without whitespace. No request was sent.\n' >&2
+  exit 1
+fi
+export ANTHROPIC_MODEL
+read -r -s -p "Anthropic API key: " ANTHROPIC_API_KEY </dev/tty
+printf '\n'
+export ANTHROPIC_API_KEY
+python labs/live-stream-tool-demo.py --live
+BASH
 ```
 
-For the published lab bundle, run `python labs/live-stream-tool-demo.py --live` from the repository root.
+The key is available to this spawned Bash process and its child processes until they exit. This block does not save it to a file or change your parent shell's environment. Keep the terminal free of shell tracing while entering and using the key.
+
+### Maintainer alternate: app checkout
+
+The public repository also contains the same starter at `app/public/materials/live-stream-tool-demo.py`. From the public repository root, this block runs that copy offline and leaves the parent shell in the repository root:
+
+```bash
+(
+  set -e
+  cd app
+  python public/materials/live-stream-tool-demo.py
+)
+```
+
+A maintainer already working inside `app/` uses `python public/materials/live-stream-tool-demo.py` instead. For an explicitly approved live run in that directory, use the silent-prompt block above with `python public/materials/live-stream-tool-demo.py --live` as its Python command. The default learner commands remain under `labs` from the repository root.
 
 The script passes `ANTHROPIC_API_KEY` to the SDK as `auth_token`. It does not also set the SDK `api_key` field. The resulting request uses `Authorization: Bearer` and pins `anthropic-version` to `2026-10-21`. Automatic retries are disabled.
 

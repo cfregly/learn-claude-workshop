@@ -1,12 +1,18 @@
 # Northstar live Claude API lab
 
-This folder is the focused backend lab extracted from the runnable app in `../../app/`. It contains the same server handler, Claude SDK dependency, fixed synthetic role context, usage controls, and backend tests. All Northstar records are fictional.
+This folder is a bounded snapshot of the backend lab extracted from the runnable app in `../../app/`. It contains its own server handler, Claude SDK dependency, fixed synthetic role context, usage controls, and backend tests. All Northstar records are fictional.
 
-The full browser interface is available in `../../app/`. This lab keeps only the public modules and fixture files required by the backend so learners can inspect the request boundary without the rest of the interface.
+Use this snapshot to inspect the request boundary. Use `../../app/` for the current full browser interface and native integration. This folder omits those features, and its handler and tests do not have full app parity.
+
+Important Ask differences:
+
+- The app accepts an optional learner-selected excerpt and request bodies up to 100 KiB. This snapshot does not accept selected excerpts and limits request bodies to 10 KiB.
+- The app preserves Ask answer text beyond 180 words when the provider returns `end_turn`. This snapshot shortens answers to 180 words and marks a shortened result incomplete, even when the provider returns `end_turn`.
+- The native integration route and its Ask context are available in the app and absent from this snapshot.
 
 ## Run
 
-Use Node.js 22 or later.
+Use Node.js 22 or later. From the repository root, first run `cd labs/live-api`. If you downloaded only this folder, open a terminal in that folder. Run the commands below from the lab folder.
 
 ```bash
 npm ci
@@ -16,7 +22,7 @@ npm start
 
 Without approved `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` environment settings, the health and capability endpoints remain available while generation stays unavailable. Do not commit credentials.
 
-Inspect capability:
+Keep the server running. In a second terminal, inspect capability:
 
 ```bash
 curl http://127.0.0.1:18120/api/demo
@@ -53,6 +59,8 @@ Each provider call has one attempt. The SDK retry count is zero. The workflow ha
 The same-origin check protects the browser route. It is not employee authentication. A production application must authorize the employee and account before retrieving records or calling a model.
 
 ## Checks
+
+Run these commands from `labs/live-api`, the same folder used for setup and startup:
 
 ```bash
 npm run check

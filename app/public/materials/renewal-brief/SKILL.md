@@ -16,7 +16,7 @@ Use only records the application has authorized for the caller and account. Keep
 1. Extract the account owner, renewal date, open support items, usage figures, discussed terms, and explicit approvals. Attach a source label to each fact.
 2. Preserve conflicts and unknowns. A discount discussion does not establish approval. An SSO question does not establish entitlement. Lower use does not establish its cause.
 3. Draft four short sections: confirmed facts, interpretation, open questions, and proposed next actions. Mark interpretation clearly. Name an owner for each action when the records support one. Otherwise say the owner needs assignment.
-4. Check every date, number, entitlement, approval, and commitment against its source. For the baseline Northstar fixture, keep the January 31, 2027 renewal, Maya Chen as owner, Case 4821 open, and the 12 percent discount approval unknown.
+4. Check every date, number, entitlement, approval, and commitment against its source.
 5. Return an internal draft for human review. Do not send messages, change a CRM field, promise a discount, or claim an action completed.
 
 ## Learning check

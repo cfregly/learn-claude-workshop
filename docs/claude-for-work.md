@@ -80,7 +80,7 @@ End with a source check and the condition for the next business decision.
 ## Choose one role task
 
 - **Account Executive:** Produce a renewal brief for call preparation. Include supported facts, open questions, a safe next step, and the evidence required before making a customer commitment.
-- **Sales manager:** Inspect the unfinished brief in the paired failure lesson. Mark missing actions and source checks, route the request change to the technical owner, and require a fresh `end_turn` response plus account-owner review before use.
+- **Sales manager:** Use the separate [saved incomplete-response exercise](incomplete-response.md#sales-manager-route). Inspect its supplied partial brief, mark missing actions and source checks, and assign the technical and account-owner next steps. This route uses that saved example, not the four-file Project prompt below.
 - **Revenue Operations:** Produce a proposed CRM field map. Leave unsupported fields blank, name each exception route, and do not perform a CRM write.
 - **Marketing:** Produce an internal claim worksheet. Mark each claim accept, revise, or reject, and state what approval would be needed before public use.
 - **Product manager:** Produce a pilot requirement. Define missing-source behavior, human review, failure behavior, acceptance checks, and a proceed, revise, or stop recommendation.
@@ -89,7 +89,7 @@ End with a source check and the condition for the next business decision.
 
 ## Copy-ready prompt
 
-Replace the bracketed line with one role task from the list above.
+For the Project routes other than Sales manager, replace the bracketed line with one role task from the list above. The Sales manager route follows the saved exercise linked above instead.
 
 ```text
 Complete this role task: [PASTE ONE ROLE TASK]
@@ -157,7 +157,7 @@ Maya Chen owns the next account-team review. The security owner remains open.
 
 ## Changed assumption
 
-The learner no longer has permission to use `support-summary.md`. Remove that file from Project knowledge or start a new private Project without it. Run the same role task again.
+The learner no longer has permission to use `support-summary.md`. Create a new private Project containing only `crm-snapshot.md`, `call-notes.md`, and `usage-summary.md`, then start a new chat there for the same Project role task. Do not copy an earlier answer or chat transcript into it. Removing Project knowledge while keeping the old chat would leave the support facts in that transcript.
 
 A safe revision removes claims about cases 4821 and 4794, states that support status is unavailable, preserves the other sourced facts, and routes the gap to an authorized support owner. It does not reconstruct the missing file from the earlier answer.
 

@@ -1,8 +1,8 @@
 # Northstar security and regulated workflow review
 
-This is a proposed 40-minute workshop for security, risk, architecture, and engineering learners. Northstar Freight, every person, every identifier, and every decision record in this file are synthetic.
+This is a proposed 40-minute offline design review for security, risk, architecture, and engineering learners. Northstar Freight, every person, every identifier, and every decision record in this file are synthetic.
 
-The exercise uses the direct Claude Messages API. It does not claim that a design, customer, or provider arrangement is compliant. Learners make an allow, revise, or stop decision from evidence.
+The exercise reviews a proposed direct Claude Messages API design on paper. Do not make a live API call or enter credentials for this exercise. It does not claim that a design, customer, or provider arrangement is compliant. Learners make an allow, revise, or stop decision from evidence.
 
 ## Learning outcome
 
@@ -55,13 +55,15 @@ In this simplified design, Anthropic operates the model service, inference compu
 
 **Reason:** The baseline has the approved synthetic account fields needed for the task. `member_id` and `service_detail` are not needed. No evidence in the exercise establishes a signed BAA, HIPAA-ready organization, ZDR arrangement, eligible feature set, or accepted regional and network design.
 
-**Request path:**
+**Proposed request path, offline walkthrough:**
+
+Walk through the following design steps without executing them. The separate opt-in live streaming lab has its own setup and limits.
 
 1. Authenticate the employee.
 2. Check access to `northstar-freight`.
 3. Select the approved baseline records.
 4. Block fields tagged `SENSITIVE` for this pilot.
-5. Send one bounded request to `/v1/messages` from the customer backend.
+5. Identify where the proposed customer backend would send one bounded request to `/v1/messages`. Do not send it during this review.
 6. Record safe response metadata and require a complete terminal state.
 7. Route the draft to the account reviewer. No CRM write occurs in the workshop.
 

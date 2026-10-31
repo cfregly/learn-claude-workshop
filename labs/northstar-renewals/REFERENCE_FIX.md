@@ -20,14 +20,20 @@ python3 -m unittest discover -s tests -v
 
 The three original tests pass because they cover day 7, day 31, and day `-1`. They do not prove the day-30 requirement.
 
-Add this regression test before editing `src/renewals.py`:
+Before editing `src/renewals.py`, add this method inside the existing `RenewalWindowTests` class in `starter/tests/test_renewals.py` (the `tests/test_renewals.py` file when your current directory is `starter/`). Keep the four-space method indentation:
 
 ```python
-def test_inclusive_boundary(self):
-    self.assertTrue(in_renewal_window(30, 30))
+    def test_inclusive_boundary(self):
+        self.assertTrue(in_renewal_window(30, 30))
 ```
 
-Run the tests again. The new test must fail because the starter uses `< window_days`.
+From `starter/`, run just that test through the actual unittest collector:
+
+```sh
+python3 -m unittest discover -s tests -p test_renewals.py -k test_inclusive_boundary -v
+```
+
+It must collect one test and fail because the starter uses `< window_days`. A module-level function with this name is not a method of the TestCase and will not establish this regression check.
 
 ## Smallest implementation change
 
@@ -43,7 +49,14 @@ to:
 return 0 <= days_remaining <= window_days
 ```
 
-Run the focused test, then run the full suite. Four tests must pass. Review the diff and reject unrelated edits.
+From `starter/`, run the focused test again, then the full suite:
+
+```sh
+python3 -m unittest discover -s tests -p test_renewals.py -k test_inclusive_boundary -v
+python3 -m unittest discover -s tests -v
+```
+
+The focused command must collect and pass one test. The full suite must collect and pass four tests. Review the diff and reject unrelated edits.
 
 ## Optional validation
 

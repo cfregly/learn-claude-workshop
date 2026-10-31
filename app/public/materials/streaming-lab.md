@@ -2,6 +2,8 @@
 
 This ten minute Northstar replay uses prepared synthetic events. It makes no network request, calls no model, and performs no account action.
 
+The event ordering and partial JSON explanations adapt the [official streaming documentation](https://platform.claude.com/docs/en/build-with-claude/streaming). The Northstar traces, task, and failure exercises apply those interfaces to this workshop. See [sources and attribution](source-and-attribution.md).
+
 ## Choose the replay or live route
 
 - **Replay for repeatable teaching and failures.** Stay in this lab at [Streaming events](https://learn.fluxcapacitor.dev/#streaming). Run the same happy, unauthorized, and interrupted traces without a credential or provider call.
@@ -109,7 +111,7 @@ A streamed response begins with `message_start`. Its `content` array is empty. E
 2. One or more `content_block_delta` events
 3. `content_block_stop`
 
-The block `index` identifies its position in the final Message content array. In the completed reference, index 0 holds text and index 1 holds `tool_use`.
+The block `index` identifies its position in the final Message content array. In the completed reference, index 0 holds text and index 1 holds `tool_use`. The following type union covers only those blocks in this prepared replay. It is not the complete API content-block type set.
 
 ```ts
 type MessageContent = TextBlock | ToolUseBlock
@@ -209,11 +211,11 @@ At block stop, the application joins the fragments and parses:
 }
 ```
 
-The schema requires a non-empty `account_id` string and a non-empty string array named `fields`. Schema success makes the request well formed. It does not grant account access.
+The schema requires an `account_id` string and a string array named `fields`. It does not enforce non-empty values. Check those conditions before dispatch. Schema success does not grant account access.
 
 ## Application authorization and execution
 
-The application compares `acct_northstar` with the signed-in employee allowlist. Only a matching, schema-valid request can move from `proposed` to client tool execution.
+The prepared application state compares `acct_northstar` with the fixture employee allowlist. Only a matching, schema-valid request can move from `proposed` to client tool execution. This replay does not implement employee sign-in. The standalone MCP lab uses the equivalent fictional identifiers `northstar-freight` and `demo-account-owner`.
 
 The lab uses these application states:
 
@@ -242,7 +244,9 @@ The unauthorized path requests `acct_aurora`, which is absent from the allowlist
 
 ## Conversation history and matching tool IDs
 
-After a client tool result, the next request preserves the original user Message, the assistant Message containing `tool_use`, and a new user Message containing `tool_result`.
+After a client tool result, the next request preserves the earlier conversation, the assistant Message containing `tool_use`, and a new user Message containing `tool_result`. The array below is a replay-only excerpt showing the tool call and matching result. It omits the earlier user Message and assistant text for readability and is not a complete continuation request.
+
+For a real continuation, append the complete received assistant `content` unchanged, including text, thinking, or redacted-thinking blocks when present. Preserve the earlier history. Do not rebuild the assistant Message from only the `tool_use` block shown here.
 
 ```json
 [
@@ -317,7 +321,7 @@ Under `display: "updates"`, a `thinking` block with text is model progress narra
 }
 ```
 
-The typed progress block is separate from `text` and `tool_use` blocks. When streamed, its text arrives in an indexed `thinking_delta`:
+The typed progress block is separate from `text` and `tool_use` blocks. When streamed, its text arrives in an indexed `thinking_delta`. The following standalone illustration uses block index 2. It is not the earlier two-block replay message:
 
 ```json
 {

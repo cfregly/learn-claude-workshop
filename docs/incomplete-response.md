@@ -53,6 +53,14 @@ The saved response is typed and readable, but it is not complete:
 }
 ```
 
+Illustrated response header for this synthetic example:
+
+```http
+request-id: req_synthetic_northstar_partial
+```
+
+The `request-id` header identifies the illustrated request. The Message body `id`, `msg_northstar_partial`, identifies the illustrated Message. They are different identifiers. Neither identifier above is a receipt from a live call.
+
 `max_tokens` means generation reached the output limit in the request. Preserve the partial text and request ID for diagnosis. Do not label the renewal brief complete. Shorten the requested output or adjust the bounded output budget, then run a fresh case.
 
 ## Engineer route
@@ -72,7 +80,7 @@ For a streaming request, the same state arrives through events:
 message_start(stop_reason=null)
 content_block_start(type=text)
 content_block_delta(text="CONFIRMED FACTS\n")
-content_block_delta(text="Northstar renews January 31, 2027 [CRM]. Case 4821 is")
+content_block_delta(text="Northstar renews January 31, 2027 [CRM]. Maya Chen owns the account [CRM]. Case 4821 is")
 content_block_stop
 message_delta(stop_reason=max_tokens)
 message_stop

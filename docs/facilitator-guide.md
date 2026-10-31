@@ -2,7 +2,7 @@
 
 Northstar Freight is synthetic. These exercises describe prospective teaching designs. They do not claim prior delivery or learner results.
 
-Everything in this guide works offline with the supplied source pack, traces, notebook, and repository ZIP. Do not enter credentials, call a live API, send messages, change external systems, install packages, commit, or push.
+The facilitation plan below uses the prepared, offline materials: the supplied source pack, traces, notebook, and repository ZIP. For this offline plan, do not enter credentials, call a live API, send messages, change external systems, install packages, commit, or push. The running app also has separately started live extensions with their own controls, prerequisites, and limits. They are not required for this offline plan.
 
 ## Universal teaching sequence
 
@@ -33,7 +33,7 @@ Do not add product or API depth until the room can identify the common path.
 
 Announce both routes and the rejoin time before the activity begins. Learners may choose the route that matches their learning need.
 
-Both routes inspect the [same reviewed API draft](../labs/integration/shared-integration.js). The Engineer traces the [integration boundaries](../labs/integration/integration-map.js). The Account Executive reviews the same customer claims and decides whether the draft is ready for account planning. The Account Executive practice step then uses a separate, deliberately flawed draft so the learner can remove an unsupported claim. The optional live call is text only. Streaming and tool use remain prepared traces. Claude for Work is an optional alternate exercise.
+Both routes inspect the [same reviewed API draft](../labs/integration/shared-integration.js). The Engineer traces the [integration boundaries](../labs/integration/integration-map.js). The Account Executive reviews the same customer claims and decides whether the draft is ready for account planning. The Account Executive practice step then uses a separate, deliberately flawed draft so the learner can remove an unsupported claim. This four-minute activity uses prepared traces for streaming and tool use. Separately, the app's optional Live demo can stream a provider response, execute one local read-only Northstar lookup, and stream the final draft. That workflow starts only when the learner presses Run live workflow and follows its own run limits. Keep it outside this offline activity unless the facilitator explicitly selects the live extension. Claude for Work is an optional alternate exercise.
 
 ### Engineer route
 
@@ -70,6 +70,8 @@ State the return time when parking a question. At the checkpoint, answer it, ass
 Faster learners work a related changed case while the common path is restored. Bring their result back only when it helps the shared objective.
 
 ## Ten path agendas
+
+These ten offline agenda examples are not an exhaustive list of the app's learning paths. The Sales manager and Security / Risk paths have their own agendas in the app. Use the agenda shown for the selected role rather than inferring its timing from another example below.
 
 ### Account Executive, 45 minutes
 
