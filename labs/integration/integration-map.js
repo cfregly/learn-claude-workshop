@@ -22,7 +22,7 @@ const envelope = {
               'Prepare the reviewed Northstar renewal brief.',
               '',
               '[CRM] Northstar Freight renews on January 31, 2027. Maya Chen is the account owner.',
-              '[CALL] SSO entitlement is unknown. A 12 percent discount was discussed. Approval is not recorded.',
+              '[CALL] SSO entitlement is unknown. A security follow-up is needed, but no owner is recorded. A 12 percent discount was discussed. Approval is not recorded.',
               '[SUPPORT CASE 4821] Delayed shipment-alert emails remain open.',
               '[USAGE] Weekly active users are 64, down from 78 in the prior period.'
             ].join('\n')
@@ -145,7 +145,10 @@ function element(documentRef, tag, text = '', className = '') {
 }
 
 function githubUrl(path, githubRef) {
-  const ref = encodeURIComponent(String(githubRef || 'main'))
+  const sourceRef = path === 'labs/claude_api_demo.py' || path === 'labs/api-trace.ipynb'
+    ? 'c0ffcb96053c3405fc2b48c1854fe0c331b006de'
+    : githubRef
+  const ref = encodeURIComponent(String(sourceRef || 'main'))
   const safePath = path.split('/').map(part => encodeURIComponent(part)).join('/')
   return `${GITHUB_ROOT}/blob/${ref}/${safePath}`
 }
@@ -219,7 +222,7 @@ export function mountIntegrationMap(host, { githubRef, role = 'engineer', select
   const intro = element(
     documentRef,
     'p',
-    'The runnable Python client is a text-only direct Messages API example. It does not stream or execute tools. Streaming and tool steps below use prepared simulations.',
+    'The runnable Python client is a text-only direct Messages API example. It does not stream or execute tools. Streaming and tool steps below use prepared simulations. The prepared request uses the fuller source notes. The minimal Python client sends a shorter excerpt.',
     'small muted'
   )
   const sourceLinks = element(documentRef, 'p', '', 'reference small')

@@ -30,7 +30,9 @@
 .live-demo { margin: 40px 0; padding-top: 28px; border-top: 1px solid var(--line); }
 .reference .live-demo { margin: 20px 0 0; padding-top: 0; border-top: 0; }
 .demo-cases { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
-.demo-cases button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.demo-cases button[aria-pressed="true"],
+.demo-cases button[aria-pressed="true"]:hover,
+.demo-cases button[aria-pressed="true"]:focus-visible { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .api-metadata { display: grid; grid-template-columns: 130px minmax(0,1fr); gap: 8px 20px; font-size: .875rem; }
 .api-metadata dt { color: var(--muted); }
 .api-metadata dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
@@ -44,6 +46,8 @@
 .code-toolbar > .code-label { margin: 0 auto 0 0; font-size: .75rem; color: var(--paper); }
 .code-copy-button { min-height: 44px; padding: 6px 12px; border: 1px solid #89959b; background: transparent; color: var(--paper); font-size: .8rem; }
 .code-copy-button:hover { background: #31434f; }
+.group-band :focus-visible,
+.code-toolbar :focus-visible { outline-color: var(--paper); }
 .code-copy-status { font-size: .75rem; }
 .code-block-wrap pre, [data-material-body] .code-block-wrap pre { margin: 0; max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; overflow-x: hidden; border-radius: 0 0 8px 8px; tab-size: 2; }
 .code-block-wrap pre code { white-space: inherit; overflow-wrap: inherit; font-size: inherit; }
@@ -91,7 +95,9 @@
 .ask-privacy { font-size: .72rem; border-top: 1px solid var(--line); padding-top: 16px; }
 .streaming-page { max-width: 1150px; }
 .streaming-lab-choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 28px; }
-.streaming-lab-choices [aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.streaming-lab-choices [aria-pressed="true"],
+.streaming-lab-choices [aria-pressed="true"]:hover,
+.streaming-lab-choices [aria-pressed="true"]:focus-visible { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .streaming-lab-trace { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
 .streaming-lab-trace > section { min-width: 0; }
 .streaming-lab-trace > details { min-width: 0; }

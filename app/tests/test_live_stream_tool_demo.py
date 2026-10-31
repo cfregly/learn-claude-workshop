@@ -23,7 +23,8 @@ SPEC = importlib.util.spec_from_file_location("live_stream_tool_demo", MODULE_PA
 assert SPEC and SPEC.loader
 demo = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = demo
-SPEC.loader.exec_module(demo)
+with mock.patch.dict(sys.modules, {"anthropic": None}):
+    SPEC.loader.exec_module(demo)
 
 
 def text_block(text: str) -> dict[str, str]:
@@ -91,11 +92,29 @@ def complete_stream(message: object, text: str) -> FakeStream:
 class LiveStreamToolDemoTests(unittest.TestCase):
     def test_offline_default_does_not_import_sdk_or_call_tool(self) -> None:
         stdout = io.StringIO()
-        with mock.patch.object(demo, "lookup_northstar_account") as lookup:
-            exit_code = demo.main([])
-            demo.print_offline_plan(stdout)
+        fresh_spec = importlib.util.spec_from_file_location(
+            "live_stream_tool_demo_offline", MODULE_PATH
+        )
+        assert fresh_spec and fresh_spec.loader
+        fresh = importlib.util.module_from_spec(fresh_spec)
+        with (
+            mock.patch.dict(sys.modules, {"anthropic": None, fresh_spec.name: fresh}),
+            mock.patch.dict(demo.os.environ, {
+                "ANTHROPIC_API_KEY": "offline-dummy-credential",
+                "ANTHROPIC_MODEL": "offline-test-model",
+            }, clear=True),
+        ):
+            fresh_spec.loader.exec_module(fresh)
+            with (
+                mock.patch.object(fresh, "build_sdk_client") as build_client,
+                mock.patch.object(fresh, "run_live") as run_live,
+                mock.patch.object(sys, "stdout", stdout),
+            ):
+                exit_code = fresh.main([])
+            build_client.assert_not_called()
+            run_live.assert_not_called()
         self.assertEqual(exit_code, 0)
-        lookup.assert_not_called()
+        self.assertIn("mode=offline", stdout.getvalue())
         self.assertIn("network_calls=0", stdout.getvalue())
         self.assertIn("tool_calls=0", stdout.getvalue())
 
@@ -185,6 +204,28 @@ class LiveStreamToolDemoTests(unittest.TestCase):
         self.assertNotIn("tool_choice", second_request)
         self.assertIn("provider_calls=2", output.getvalue())
         self.assertIn("read_only_lookups=1", output.getvalue())
+
+    def test_second_tool_request_is_refused_after_two_mocked_calls_and_one_lookup(self) -> None:
+        first_message = SimpleNamespace(stop_reason="tool_use", content=[tool_block()])
+        second_message = SimpleNamespace(
+            stop_reason="tool_use",
+            content=[{**tool_block(), "id": "toolu_second_request"}],
+        )
+        client = FakeClient([
+            complete_stream(first_message, ""),
+            complete_stream(second_message, ""),
+        ])
+        lookup = mock.Mock(return_value={"synthetic": True, "read_only": True})
+        output = io.StringIO()
+
+        with self.assertRaises(demo.LabError) as caught:
+            demo.run_live(client, "offline-test-model", output, lookup)
+
+        self.assertEqual(caught.exception.exit_code, demo.EXIT_PROTOCOL)
+        self.assertIn("A second tool request was refused", str(caught.exception))
+        self.assertEqual(len(client.messages.calls), 2)
+        lookup.assert_called_once_with(demo.ACCOUNT_ID)
+        self.assertNotIn("ready_for_human_source_review", output.getvalue())
 
     def test_other_models_do_not_get_a_hardcoded_thinking_mode(self) -> None:
         first = demo.build_first_request("another-enabled-model")

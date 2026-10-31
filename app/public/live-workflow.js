@@ -328,6 +328,7 @@ export function mountLiveWorkflow(host, { roleId = 'engineer', showRoleLinks = t
   }
 
   function finishControls() {
+    activeController?.abort()
     running = false
     activeController = null
     abortReason = ''

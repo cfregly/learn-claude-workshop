@@ -92,7 +92,7 @@ export const paths = [
     exercise: {
       prompt: "Complete a pilot decision card. Name the decision, pilot scope, required people and tools, spending limit, named owner, human reviewer, success signals, review date, stop condition, evidence still needed, and next owner.",
       template: "Decision:\nPilot scope:\nRequired resources:\nSpending limit:\nNamed owner:\nReviewer:\nSuccess signals:\nReview date:\nStop condition:\nEvidence still needed:\nNext owner:",
-      reference: "DECISION: Proceed with an internal offline pilot only. SCOPE: Five synthetic variants with no customer-facing use. OWNER: Jordan Lee, fictional pilot owner. REVIEWERS: Maya Chen and Priya Shah, fictional account reviewers. RESOURCES: One engineer, the offline fixture set, a review scorecard, and reviewer time. SPENDING LIMIT: $100 illustrative cap for the exercise, not real authorized spend. REVIEW DATE: November 6, 2026. QUALITY CRITERIA: Five of five variants preserve critical fields and produce zero unsupported commitments. TIME CRITERION: Preparation plus correction is 12 minutes or less per brief, with reviewer effort recorded. STOP CONDITION: Any invented commitment, missing source check, or skipped reviewer stops the pilot. NEXT OWNER: Jordan Lee compiles the evidence for Avery Brooks, fictional COO, who decides whether to revise, stop, or expand.",
+      reference: "DECISION: Proceed with an internal offline pilot only. SCOPE: Five synthetic variants with no customer-facing use. OWNER: Jordan Lee, fictional pilot owner. REVIEWERS: Maya Chen and Priya Shah, fictional account reviewers. RESOURCES: One engineer, the offline fixture set, a review scorecard, and reviewer time. SPENDING LIMIT: $100 illustrative cap for the exercise, not real authorized spend. REVIEW DATE: November 6, 2026. QUALITY CRITERIA: Five of five variants preserve critical fields and produce zero unsupported commitments. TIME CRITERION: Preparation plus correction is 12 minutes or less per brief, with reviewer effort recorded. EVIDENCE STILL NEEDED: Record current manual preparation and correction time. Collect pilot quality, total work, and operating cost for the same variants before considering expansion. STOP CONDITION: Any invented commitment, missing source check, or skipped reviewer stops the pilot. NEXT OWNER: Jordan Lee compiles the evidence for Avery Brooks, fictional COO, who decides whether to revise, stop, or expand.",
       checks: [
         "The decision names one accountable owner and the next owner",
         "The close states resources, spending limit, and review date",
@@ -102,8 +102,8 @@ export const paths = [
       ]
     },
     challenge: {
-      prompt: "The operating-cost estimate doubles and the support owner is no longer available. Revisit the decision and state what must change before the pilot proceeds.",
-      reference: "Revise or defer the pilot. Assign a new support owner, reduce scope or cost, and keep the original quality and review conditions. Do not claim that the first estimate was measured performance."
+      prompt: "A revised operating cost estimate exceeds the exercise's illustrative $100 cap, and the planned engineer is unavailable. Revisit the decision and state what must change before the pilot proceeds.",
+      reference: "Revise or defer the pilot. Secure an engineer and revise the plan to fit the illustrative $100 cap before proceeding. Keep the original quality and review conditions. Treat the revised estimate as a hypothetical assumption, not a measured result."
     },
     quiz: [
       {
@@ -238,14 +238,14 @@ export const paths = [
     demo: {
       title: "A controlled CRM handoff",
       before: "The next-step field is blank, SSO entitlement is absent, the discount has no approval, and the security follow-up has no owner.",
-      after: "PROPOSED FIELD MAP: renewal_date = 2027-01-31 [CRM], account_owner = Maya Chen [CRM], support_case = 4821 open [SUPPORT], weekly_active_users = 64 with prior value 78 [USAGE]. KEEP BLANK: sso_entitlement, discount_approval, security_owner. EXCEPTION ROUTES: Commercial approver verifies the discount. Product specialist answers SSO. Maya assigns the security follow-up. REVIEWER: Maya Chen. WRITE STATUS: Proposed only, no CRM update performed.",
+      after: "PROPOSED FIELD MAP: renewal_date = 2027-01-31 [CRM], account_owner = Maya Chen [CRM], support_case = 4821 open [SUPPORT], weekly_active_users = 64 with prior value 78 [USAGE]. KEEP BLANK: next_step, sso_entitlement, discount_approval, security_owner. EXCEPTION ROUTES: Commercial approver verifies the discount. Product specialist answers SSO. Maya assigns the next action and the security follow-up. REVIEWER: Maya Chen. WRITE STATUS: Proposed only, no CRM update performed.",
       notice: "A blank can be the correct result. The workflow becomes unsafe when a draft turns an unresolved field into a confirmed value."
     },
     value: "The team can reduce manual handoff work while keeping exceptions and audit history visible.",
     exercise: {
       prompt: "Map each Northstar fact to a proposed CRM field. Mark each unsupported field as blank, conflict, or needs owner. Add an exception route and review owner. Do not perform a CRM write.",
-      template: "Field:\nProposed value:\nSource:\nStatus: supported, blank, or conflict\nException route:\nReviewer:",
-      reference: "FIELD renewal_date, VALUE 2027-01-31, SOURCE CRM, STATUS supported. FIELD account_owner, VALUE Maya Chen, SOURCE CRM, STATUS supported. FIELD support_case, VALUE 4821 open, SOURCE SUPPORT, STATUS supported. FIELD weekly_active_users, VALUE 64 with prior value 78, SOURCE USAGE, STATUS supported. FIELD sso_entitlement, VALUE blank, STATUS needs owner, ROUTE product specialist. FIELD discount_approval, VALUE blank, STATUS needs owner, ROUTE commercial approver. FIELD security_owner, VALUE blank, STATUS needs owner, ROUTE Maya Chen. REVIEWER Maya Chen. No CRM write is part of the exercise.",
+      template: "Field:\nProposed value:\nSource:\nStatus: supported, blank, conflict, or needs owner\nException route:\nReviewer:",
+      reference: "FIELD renewal_date, VALUE 2027-01-31, SOURCE CRM, STATUS supported. FIELD account_owner, VALUE Maya Chen, SOURCE CRM, STATUS supported. FIELD support_case, VALUE 4821 open, SOURCE SUPPORT, STATUS supported. FIELD weekly_active_users, VALUE 64 with prior value 78, SOURCE USAGE, STATUS supported. FIELD next_step, VALUE blank, SOURCE CRM, STATUS needs owner, ROUTE Maya Chen assigns the next action. FIELD sso_entitlement, VALUE blank, STATUS needs owner, ROUTE product specialist. FIELD discount_approval, VALUE blank, STATUS needs owner, ROUTE commercial approver. FIELD security_owner, VALUE blank, STATUS needs owner, ROUTE Maya Chen. REVIEWER Maya Chen. No CRM write is part of the exercise.",
       checks: [
         "Every populated field has a source",
         "Blank and conflicting fields stay visible",
@@ -379,14 +379,14 @@ export const paths = [
     demo: {
       title: "Two briefs, two product behaviors",
       before: "One brief preserves missing SSO and discount approval. The other fills both gaps and implies that lower usage means churn risk.",
-      after: "PILOT BRIEF: Target user is an account owner preparing a renewal call. Job is to create a reviewed brief from CRM, CALL, SUPPORT, and USAGE files. In scope are five synthetic cases and draft-only output. Out of scope are CRM writes, sent messages, pricing approval, and customer-facing use. Missing data stays visible. A failed or truncated request is withheld. Maya Chen and Priya Shah, fictional reviewers, check every brief. PASS requires zero unsupported commitments, every critical field correct, and preparation plus correction at or below 12 minutes per brief. DECISION: Proceed with the offline pilot and review results on November 6, 2026.",
+      after: "PILOT BRIEF: Target user is an account owner preparing a renewal call. Job is to create a reviewed brief from CRM, CALL, SUPPORT, and USAGE files. In scope are five synthetic cases and draft-only output. Out of scope are CRM writes, sent messages, pricing approval, and customer-facing use. Missing data stays visible. A failed or truncated request is withheld. Each brief is checked by Maya Chen or Priya Shah, fictional reviewers. PASS requires zero unsupported commitments, every critical field correct, and preparation plus correction at or below 12 minutes per brief. Record latency and cost for the same five variants before deciding whether to expand. DECISION: Proceed with the offline pilot and review results on November 6, 2026.",
       notice: "Useful behavior includes refusing to complete the story when evidence is absent."
     },
     value: "A clear requirement helps engineering and design build the right behavior and gives the pilot a defensible decision point.",
     exercise: {
       prompt: "Write the target user, initial scope, approved sources, visible unknown behavior, human review, failure behavior, and acceptance checks. Recommend proceed, revise, or stop.",
       template: "Target user:\nJob to be done:\nApproved sources:\nIn scope:\nOut of scope:\nMissing-data behavior:\nFailure behavior:\nHuman review:\nAcceptance checks:\nDecision:",
-      reference: "TARGET USER: Account owner preparing a renewal call. APPROVED SOURCES: CRM, CALL, SUPPORT, and USAGE synthetic files. SCOPE: Five synthetic variants and draft-only output. OUT OF SCOPE: CRM writes, sent messages, pricing approval, and customer-facing use. MISSING DATA: Show the missing source or field and do not fill it. FAILURE: Withhold truncated output and display the terminal state. HUMAN REVIEW: Maya Chen or Priya Shah, fictional reviewers, compares every brief with the records. ACCEPTANCE: All five variants preserve critical facts, produce zero unsupported commitments, and take no more than 12 minutes per brief for preparation plus correction. DECISION: Proceed with the offline pilot. REVIEW DATE: November 6, 2026.",
+      reference: "TARGET USER: Account owner preparing a renewal call. APPROVED SOURCES: CRM, CALL, SUPPORT, and USAGE synthetic files. SCOPE: Five synthetic variants and draft-only output. OUT OF SCOPE: CRM writes, sent messages, pricing approval, and customer-facing use. MISSING DATA: Show the missing source or field and do not fill it. FAILURE: Withhold truncated output and display the terminal state. HUMAN REVIEW: Maya Chen or Priya Shah, fictional reviewers, compares every brief with the records. ACCEPTANCE: All five variants preserve critical facts, produce zero unsupported commitments, and take no more than 12 minutes per brief for preparation plus correction. Record latency and cost for the same five variants before deciding whether to expand. DECISION: Proceed with the offline pilot. REVIEW DATE: November 6, 2026.",
       checks: [
         "The requirement names the user and decision",
         "Missing support data produces a visible gap",
@@ -450,14 +450,14 @@ export const paths = [
     demo: {
       title: "Trace the architecture and one failure",
       before: "FLAWED FLOW: employee -> backend attaches Northstar facts -> account access check -> POST /v1/messages -> final brief. TRACE A: TIMEOUT before any request ID. TRACE B: HTTP 401 with request ID req_offline_401. TRACE C: HTTP 200 with request ID req_offline_context, but SUPPORT version 2026-10-01 was selected instead of approved version 2026-10-13.",
-      after: "ANNOTATED FLOW: employee -> [1 application account access] -> [2 approved CRM, CALL, SUPPORT, and USAGE selection] -> [3 bounded backend] -> [4 POST /v1/messages] -> [5 typed blocks and terminal stream] -> [6 source check] -> [7 human review] -> existing process. TRACE A first inspection: DNS, TLS, egress, and timeout budget. Test a known reachable endpoint from the same backend. TRACE B first inspection: Authorization header, API workspace access, API version, and endpoint. Test a minimal approved request. TRACE C first inspection: retrieval filter, selected version, and source timestamp. Assert that SUPPORT version 2026-10-13 is attached before invocation.",
-      notice: "Network failure, API permission failure, and incorrect source context can look similar to a user but require different first inspections."
+      after: "ANNOTATED FLOW: employee -> [1 application account access] -> [2 approved CRM, CALL, SUPPORT, and USAGE selection] -> [3 bounded backend] -> [4 POST /v1/messages] -> [5 typed blocks and terminal stream] -> [6 source check] -> [7 human review] -> existing process. TRACE A first inspection: DNS, TLS, egress, and timeout budget. Test a known reachable endpoint from the same backend. TRACE B first inspection: credential presence and validity, then the expected authentication header, API version, and endpoint. Test a minimal approved request. TRACE C first inspection: retrieval filter, selected version, and source timestamp. Assert that SUPPORT version 2026-10-13 is attached before invocation.",
+      notice: "Network failure, API authentication failure, and incorrect source context can look similar to a user but require different first inspections."
     },
     value: "The design places Claude inside the customer's application workflow while keeping access, failure, and review ownership explicit.",
     exercise: {
-      prompt: "Annotate the Northstar flow from employee request through reviewed output. Decide where the backend runs, how it receives approved context, and whether customer constraints require a private network or retrieval component. Connect authentication, typed content, streaming, stop reasons, tools, and errors to design choices. Diagnose the supplied network, API permission, and incorrect-context traces.",
+      prompt: "Annotate the Northstar flow from employee request through reviewed output. Decide where the backend runs, how it receives approved context, and whether customer constraints require a private network or retrieval component. Connect authentication, typed content, streaming, stop reasons, tools, and errors to design choices. Diagnose the supplied network, API authentication, and incorrect-context traces.",
       template: "Backend location:\nCaller identity:\nAccount authorization:\nApproved context:\nNetwork requirement:\nDirect API authentication:\nRequest and stream contract:\nLogs and request ID:\nReview boundary:\nMain tradeoff:\nFailed layer:\nFirst inspection:\nTest that exposes a bad assumption:",
-      reference: "RECOMMENDATION: Run the direct API call from the existing bounded backend. Call check_account_access before reading Northstar records. Select the approved CRM, CALL, SUPPORT, and USAGE versions. Send a bounded request, filter typed content blocks, require a terminal stream event, log request ID and safe counts, then route the draft to human review. MAIN TRADEOFF: The existing backend keeps the path simple, while application code must own access, source selection, and stream state. TRACE A is a network path failure. Inspect DNS, TLS, egress, and timeout budget, then test reachability from the same backend. TRACE B is API authentication or permission failure. Inspect the Authorization header, workspace access, API version, and endpoint, then send a minimal approved request. TRACE C is incorrect context. Inspect retrieval filters, selected version, and timestamps, then assert SUPPORT version 2026-10-13 before invocation. Add private connectivity or retrieval only when customer constraints require it.",
+      reference: "RECOMMENDATION: Run the direct API call from the existing bounded backend. Call check_account_access before reading Northstar records. Select the approved CRM, CALL, SUPPORT, and USAGE versions. Send a bounded request, filter typed content blocks, require a terminal stream event, log request ID and safe counts, then route the draft to human review. MAIN TRADEOFF: The existing backend keeps the path simple, while application code must own access, source selection, and stream state. TRACE A is a network path failure. Inspect DNS, TLS, egress, and timeout budget, then test reachability from the same backend. TRACE B is an API authentication failure (401). Inspect credential presence and validity and the expected authentication header first, then verify the API version and endpoint before a minimal approved request. A 403 is a permission error. TRACE C is incorrect context. Inspect retrieval filters, selected version, and timestamps, then assert SUPPORT version 2026-10-13 before invocation. Add private connectivity or retrieval only when customer constraints require it.",
       checks: [
         "The design separates employee account access from direct API authentication",
         "Each API behavior is connected to a design choice",
@@ -612,26 +612,26 @@ export const paths = [
     category: "Technical",
     surface: "Claude Platform evaluation workflow",
     minutes: 40,
-    summary: "Score the Northstar workflow on ordinary and difficult cases, then propose one targeted improvement.",
+    summary: "Check the Northstar evaluator with copied positive controls and one negative control, then propose a targeted change only when a control behaves incorrectly.",
     outcome: "The learner can build a task-specific scorecard, explain a failure, and judge whether a change improves the right behavior.",
-    task: "Evaluate the renewal brief across baseline, conflict, missing-field, and untrusted-instruction cases.",
+    task: "Check the renewal-brief evaluator across baseline, conflict, missing-field, and untrusted-instruction positive controls, plus one unsupported-approval negative control.",
     explanation: "The evaluation mirrors the real task. Code can grade stable factual fields, while a short human rubric can grade tone and usefulness. Telemetry helps diagnose behavior but does not replace output checks.",
     demo: {
       title: "One baseline and three difficult cases",
-      before: "The system passes a fluent baseline, but no one has checked conflicting dates, missing SSO evidence, or an instruction that tries to approve the discount.",
-      after: "SCORECARD: Baseline PASS, with Maya, case 4821, 78 to 64 usage, and unknown discount preserved. Conflicting-date PASS, with January 31 and February 15 both visible and unresolved. Missing-SSO PASS, with SSO marked not in source. Untrusted-instruction PASS, with discount_approved still false. Combined conflict plus max_tokens FAIL, with output withheld as incomplete. Each row records stop reason, latency, tokens, tool count, and error class without hiding the critical result.",
+      before: "A scorecard says PASS without distinguishing copied expected values from generated answers or checking whether it rejects an unsupported approval.",
+      after: "EVALUATOR CONTROLS: Baseline PASS, conflicting-date PASS, missing-SSO PASS, and untrusted-instruction PASS are the expected results for four positive controls copied from fixture expectations. They are not model outputs and do not measure model quality. discount_approved:false means no approved-discount assertion, while business approval remains unknown. NEGATIVE CONTROL: Change discount_approved to true in a copy of the baseline expectation. The evaluator must reject that unsupported approval. Model stop reason, latency, tokens, tool count, and model error class are not measured by these offline controls. Tone is not assessed by copied structured values.",
       notice: "A single aggregate score can hide a severe commitment error. Keep critical checks visible."
     },
     value: "The team can find regressions and unsafe behavior before the workflow reaches customer-facing use.",
     exercise: {
-      prompt: "Score the four saved fixtures. Grade stable facts with exact checks, grade tone with a short rubric, and record stop reason, latency, input and output tokens, tool count, and error class. Explain one failure and one targeted change.",
-      template: "Case:\nCritical factual checks:\nUnknowns preserved:\nUnsupported commitment:\nFact and synthesis boundary:\nTone:\nStop reason:\nLatency and tokens:\nTool count:\nError class:\nDecision:\nTargeted change:",
-      reference: "A passing baseline preserves Maya as owner, case 4821, the 64 versus 78 usage comparison, unknown SSO and security ownership, and the unknown discount approval. The conflicting-date case keeps both dates visible. The missing-SSO case does not invent a question or entitlement. The untrusted instruction never changes discount status.",
+      prompt: "Check the evaluator using the four positive controls copied from fixture expectations and the deliberate unsupported-approval negative control. Explain why the negative control must be rejected. Mark model stop reason, latency, input and output tokens, tool count, and model error class as not measured. Mark tone as not assessed by these structured values. If a control behaves incorrectly, name the failing check and propose one targeted change. If every control behaves as intended, state that no corrective change is required.",
+      template: "Case:\nCritical factual checks:\nUnknowns preserved:\nUnsupported commitment:\nFact and synthesis boundary:\nTone: Not assessed by copied structured values\nStop reason: Not measured\nLatency and tokens: Not measured\nTool count: Not measured\nError class: Model error class not measured\nDecision:\nTargeted change: None required if all controls behave as intended",
+      reference: "EXPECTED POSITIVE CONTROLS: Baseline PASS, conflicting-date PASS with both dates retained, missing-SSO PASS with not_in_source, and untrusted-instruction PASS with discount_approved:false. These values are copied fixture expectations, not generated answers or evidence of model quality. BUSINESS STATUS: false means no approved-discount assertion, with business approval still unknown. NEGATIVE CONTROL: The copied baseline with discount_approved:true must fail the discount check. If it is wrongly accepted, correct the evaluator's unsupported-approval check and repeat the controls. If all controls behave as intended, no corrective change is required. TELEMETRY: Model stop reason, latency, tokens, tool count, and model error class are not measured. TONE: Not assessed by the copied structured values.",
       checks: [
         "Critical commitment errors remain visible outside an aggregate score",
         "The scorecard preserves source pointers and unknowns",
-        "The learner distinguishes task quality from latency and token telemetry",
-        "The proposed change targets the observed failure"
+        "The learner does not treat copied controls as measured model quality or telemetry",
+        "A targeted change is proposed only when a control behaves incorrectly"
       ]
     },
     challenge: {
@@ -883,7 +883,7 @@ export const paths = [
     },
     challenge: {
       prompt: "A signed BAA and HIPAA-ready organization are now confirmed. The team also proposes the Files API, while the customer changes its rule to require private-only connectivity. Reassess the decision using the current feature table and network evidence.",
-      reference: "DECISION: Stop the proposed design. A signed BAA does not make every feature eligible. The current official feature table must cover each selected feature, and the Files API is not listed as HIPAA eligible. The direct API evidence shows a public HTTPS endpoint with fixed IP ranges, not a verified private-only path. Keep eligible content inline through the Messages API only if the signed agreement and organization settings cover it. If private-only connectivity remains mandatory, assign the architecture owner to obtain a supported design from Anthropic before proceeding."
+      reference: "DECISION: Stop the proposed design. A signed BAA does not make every feature eligible. Check the current official feature-eligibility table and the actual signed agreement and organization settings for each selected feature, including Files API. Stop if eligibility is not established. Recheck at decision time rather than relying on the October 30, 2026 source check. The direct API evidence shows a public HTTPS endpoint with fixed IP ranges, not a verified private-only path. Keep eligible content inline through the Messages API only if the signed agreement and organization settings cover it. If private-only connectivity remains mandatory, assign the architecture owner to obtain a supported design from Anthropic before proceeding."
     },
     quiz: [
       {
@@ -930,7 +930,7 @@ export const paths = [
       recovery: "Give a blocked learner the completed control table and the 403 trace. Ask them to distinguish reachability, provider permission, and application access before rejoining. Give a faster learner the changed BAA, Files API, and private-connectivity case."
     },
     resources: [
-      { label: "API and data retention", url: "https://platform.claude.com/docs/en/manage-claude/api-and-data-retention" },
+      { label: "Feature eligibility", url: "https://platform.claude.com/docs/en/manage-claude/api-and-data-retention#feature-eligibility" },
       { label: "Data residency", url: "https://platform.claude.com/docs/en/manage-claude/data-residency" },
       { label: "Authentication", url: "https://platform.claude.com/docs/en/manage-claude/authentication" },
       { label: "API IP addresses", url: "https://platform.claude.com/docs/en/api/ip-addresses" },

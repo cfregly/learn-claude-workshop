@@ -305,16 +305,17 @@ def run_live(
     second_request = build_second_request(model, continuation_messages)
     second = stream_message(client, second_request, output)
     second_message = _require_complete(second, "The final provider stream", output)
-    if _value(second_message, "stop_reason") != "end_turn":
-        output.write("\nstatus=incomplete\n")
-        raise LabError("The final response did not end with end_turn.", EXIT_INCOMPLETE)
-
     second_content = _value(second_message, "content")
     if not isinstance(second_content, list):
         raise LabError("The final response content is malformed.", EXIT_PROTOCOL)
     normalized_second = [_block_to_dict(block) for block in second_content]
-    if any(block.get("type") == "tool_use" for block in normalized_second):
+    if _value(second_message, "stop_reason") == "tool_use" or any(
+        block.get("type") == "tool_use" for block in normalized_second
+    ):
         raise LabError("A second tool request was refused. No second lookup ran.", EXIT_PROTOCOL)
+    if _value(second_message, "stop_reason") != "end_turn":
+        output.write("\nstatus=incomplete\n")
+        raise LabError("The final response did not end with end_turn.", EXIT_INCOMPLETE)
     final_text = "".join(
         block.get("text", "") for block in normalized_second if block.get("type") == "text"
     ).strip()
@@ -355,7 +356,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if not args.live:
-        print_offline_plan()
+        print_offline_plan(sys.stdout)
         return 0
 
     auth_token = os.environ.get("ANTHROPIC_API_KEY", "").strip()
@@ -378,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
 
     client = build_sdk_client(auth_token, Anthropic)
     try:
-        run_live(client, model)
+        run_live(client, model, sys.stdout)
     except LabError as exc:
         print(f"error={exc}", file=sys.stderr)
         return exc.exit_code
