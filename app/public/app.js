@@ -10,6 +10,7 @@ import { mountLiveWorkflow } from './live-workflow.js?v=learning-context-3'
 import { mountNativeIntegration } from './native-integration.js?v=learning-context-3'
 const githubRef = '75ba253996e7da32a9a7bdbfd3096d575b0bc3fe'
 const updatedGuidesRef = 'c0ffcb96053c3405fc2b48c1854fe0c331b006de'
+const protocolSourceRef = 'cf21755b981ed1edebd081d4ec89a128b385a680'
 const nativeIntegrationRef = 'c74acd400dbb05243116993ada98f23349616549'
 const githubRoot = 'https://github.com/cfregly/learn-claude-workshop'
 const githubFile = path => `${githubRoot}/blob/${githubRef}/${path}`
@@ -339,7 +340,7 @@ function materialLink(file) {
     'diagnostics-lab.js':['diagnose','labs/diagnostics/diagnostics-lab.js'],
     'hooks-lab.md':['hooks-lab','docs/hooks-lab.md'],
     'live-stream-tool-demo.md':['live-stream-tool','docs/live-stream-tool-demo.md',updatedGuidesRef],
-    'live-stream-tool-demo.py':['live-stream-tool-code','labs/live-stream-tool-demo.py',updatedGuidesRef],
+    'live-stream-tool-demo.py':['live-stream-tool-code','labs/live-stream-tool-demo.py',protocolSourceRef],
     'skills-tools-example.md':['native-integration','docs/skills-tools-example.md',updatedGuidesRef]
   }
   const [slug,path,ref=githubRef] = links[file]

@@ -437,7 +437,7 @@ test('the native guide opens the standalone README inline and keeps the native b
     'https://github.com/cfregly/learn-claude-workshop/tree/c74acd400dbb05243116993ada98f23349616549/labs/skills/renewal-brief')
 })
 
-test('updated guide refs leave unrelated material refs unchanged', async t => {
+test('protocol code ref is independent of guide and unrelated material refs', async t => {
   const { document } = setup(t)
   const container = document.createElement('main')
   document.body.append(container)
@@ -448,7 +448,6 @@ test('updated guide refs leave unrelated material refs unchanged', async t => {
     ['facilitator', 'docs/facilitator-guide.md'],
     ['security', 'docs/security-workshop.md'],
     ['live-stream-tool', 'docs/live-stream-tool-demo.md'],
-    ['live-stream-tool-code', 'labs/live-stream-tool-demo.py'],
     ['api-client', 'labs/claude_api_demo.py'],
     ['notebook', 'labs/api-trace.ipynb'],
     ['claude-for-work', 'docs/claude-for-work.md'],
@@ -460,6 +459,9 @@ test('updated guide refs leave unrelated material refs unchanged', async t => {
     assert.equal(find(container, node => node.tagName === 'A' && node.textContent === 'View original on GitHub').href,
       `https://github.com/cfregly/learn-claude-workshop/${tree ? 'tree' : 'blob'}/c0ffcb96053c3405fc2b48c1854fe0c331b006de/${path}`)
   }
+  await renderMaterial(container, 'live-stream-tool-code', { githubRef: 'unrelated-material-ref' })
+  assert.equal(find(container, node => node.tagName === 'A' && node.textContent === 'View original on GitHub').href,
+    'https://github.com/cfregly/learn-claude-workshop/blob/cf21755b981ed1edebd081d4ec89a128b385a680/labs/live-stream-tool-demo.py')
   assert.equal(materialIdForHref('https://github.com/cfregly/learn-claude-workshop/blob/c0ffcb96053c3405fc2b48c1854fe0c331b006de/app/public/materials/renewal-brief/SKILL.md', { repository: true }), 'renewal-skill')
   await renderMaterial(container, 'source-pack', { githubRef: 'unrelated-material-ref' })
   assert.equal(find(container, node => node.tagName === 'A' && node.textContent === 'View original on GitHub').href,

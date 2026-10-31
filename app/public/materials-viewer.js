@@ -1,6 +1,7 @@
 const REPO = 'https://github.com/cfregly/learn-claude-workshop'
 const NATIVE_REF = 'c74acd400dbb05243116993ada98f23349616549'
 const UPDATED_GUIDES_REF = 'c0ffcb96053c3405fc2b48c1854fe0c331b006de'
+const PROTOCOL_SOURCE_REF = 'cf21755b981ed1edebd081d4ec89a128b385a680'
 const renders = new WeakMap()
 let readerSession = null
 
@@ -28,7 +29,7 @@ const materials = {
   'live-stream-tool-code': {
     title: 'Runnable streaming and tool client',
     description: 'A Python SDK exercise with an offline default and an explicit live streaming mode.',
-    local: '/materials/live-stream-tool-demo.py', github: 'labs/live-stream-tool-demo.py', githubRef: UPDATED_GUIDES_REF, kind: 'python'
+    local: '/materials/live-stream-tool-demo.py', github: 'labs/live-stream-tool-demo.py', githubRef: PROTOCOL_SOURCE_REF, kind: 'python'
   },
   'hooks-lab': {
     title: 'Before and after an account action',
