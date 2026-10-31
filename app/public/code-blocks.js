@@ -107,7 +107,10 @@ export function formatCode(text, language = '') {
   if (hint && !jsonHint) return source
   if (!jsonHint && !/^\s*[\[{]/.test(source)) return source
   try {
-    return JSON.stringify(JSON.parse(source), null, 2)
+    const parsed = JSON.parse(source)
+    const compactSource = source.replace(/"(?:\\.|[^"\\])*"|\s+/g, match => match[0] === '"' ? match : '')
+    if (JSON.stringify(parsed) !== compactSource) return source
+    return JSON.stringify(parsed, null, 2)
   } catch {
     return source
   }
@@ -168,6 +171,9 @@ export function tokenizeCode(text, language = '') {
 
 function renderCode(pre, source, language) {
   const existingCode = Array.from(pre.children).find(child => child.matches?.('code'))
+  const hasAuthoredSiblings = existingCode && Array.from(pre.childNodes).some(node =>
+    node !== existingCode && (node.nodeType !== 3 || node.textContent.trim()))
+  if (hasAuthoredSiblings) return false
   if (!HIGHLIGHT_LANGUAGES.has(language)) {
     if (existingCode) {
       renderedBlocks.set(pre, { code: existingCode, source, language })
@@ -185,7 +191,9 @@ function renderCode(pre, source, language) {
   const codeIsCurrent = Boolean(current && current.code === existingCode &&
     current.source === source &&
     current.language === language &&
-    pre.textContent === source)
+    pre.textContent === source &&
+    current.nodes?.length === existingCode.childNodes.length &&
+    current.nodes.every((node, index) => existingCode.childNodes[index] === node))
   if (codeIsCurrent) return false
 
   const doc = pre.ownerDocument
@@ -194,7 +202,7 @@ function renderCode(pre, source, language) {
   const hasAuthoredMarkup = Array.from(code.children).some(child => !child.classList.contains('code-token'))
   if (hasAuthoredMarkup) {
     if (pre.childNodes.length !== 1 || pre.firstElementChild !== code) pre.replaceChildren(code)
-    renderedBlocks.set(pre, { code, source, language })
+    renderedBlocks.set(pre, { code, source, language, nodes: Array.from(code.childNodes) })
     return false
   }
   code.classList.add('code-highlight', `language-${language}`)
@@ -212,7 +220,7 @@ function renderCode(pre, source, language) {
   }
   code.replaceChildren(...children)
   if (pre.childNodes.length !== 1 || pre.firstElementChild !== code) pre.replaceChildren(code)
-  renderedBlocks.set(pre, { code, source, language })
+  renderedBlocks.set(pre, { code, source, language, nodes: Array.from(code.childNodes) })
   return true
 }
 

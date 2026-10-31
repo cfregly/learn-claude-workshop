@@ -3,6 +3,32 @@ import assert from 'node:assert/strict'
 
 import { enhanceCodeBlocks, formatCode, observeCodeBlocks, tokenizeCode } from '../public/code-blocks.js'
 
+const LOSSY_JSON_SOURCES = [
+  '{"id":9007199254740993}',
+  '{"value":1e400}',
+  '{"a":1,"a":2}',
+  '{"b":1,"10":2,"2":3}',
+  '{"value":1.0,"negativeZero":-0}',
+  '{"count":-12.5e+2}',
+  String.raw`{"text":"\u00e9","path":"\/"}`
+]
+
+async function copyFrom(root) {
+  const copied = []
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: { clipboard: { writeText: async value => copied.push(value) } }
+  })
+  try {
+    await root.querySelector('.code-copy-button').click()
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, 'navigator', descriptor)
+    else delete globalThis.navigator
+  }
+  return copied
+}
+
 class TestNode {
   constructor(documentRef, tagName = '', nodeType = 1) {
     this.ownerDocument = documentRef
@@ -173,6 +199,18 @@ test('formatCode preserves invalid JSON exactly', () => {
   assert.equal(formatCode(source), source)
 })
 
+test('formatCode preserves JSON values, duplicate keys, order, and lexical spellings', () => {
+  for (const source of LOSSY_JSON_SOURCES) {
+    assert.equal(formatCode(source, 'json'), source)
+    assert.equal(formatCode(source), source)
+  }
+})
+
+test('formatCode ignores only whitespace outside JSON strings when checking losslessness', () => {
+  const source = ' \n{\t"message": "keep  spaces",\n"ready": true}\r\n'
+  assert.equal(formatCode(source, 'json'), '{\n  "message": "keep  spaces",\n  "ready": true\n}')
+})
+
 test('formatCode preserves Python, SSE, and plain source text exactly', () => {
   const python = '{"looks": "json"}\nprint("keep source")\n'
   const sse = 'event: message_delta\ndata: {"stop_reason":"max_tokens"}\n\n'
@@ -188,11 +226,11 @@ test('tokenizeCode identifies every JSON role without changing visible text', ()
   const tokens = tokenizeCode(source, 'json')
   assert.equal(tokens.map(token => token.text).join(''), source)
   assert.deepEqual(new Set(tokens.map(token => token.type)), new Set([
-    'plain', 'punctuation', 'operator', 'key', 'string', 'number', 'boolean', 'null'
+    'punctuation', 'operator', 'key', 'string', 'number', 'boolean', 'null'
   ]))
   assert.equal(tokens.find(token => token.type === 'key')?.text, '"account"')
   assert.equal(tokens.find(token => token.type === 'string')?.text, '"Northstar <script>"')
-  assert.equal(tokens.find(token => token.type === 'number')?.text, '-1250')
+  assert.equal(tokens.find(token => token.type === 'number')?.text, '-12.5e+2')
 })
 
 test('non-JSON enhancement preserves existing code markup and bare child nodes', () => {
@@ -276,6 +314,92 @@ test('highlighting keeps unsafe HTML literal, preserves clipboard text, and adds
     else delete globalThis.navigator
   }
   assert.deepEqual(copied, [visible])
+})
+
+test('lossy JSON stays verbatim through highlighting, token reconstruction, and copy', async () => {
+  for (const source of LOSSY_JSON_SOURCES) {
+    const documentRef = new TestDocument()
+    const root = documentRef.createElement('main')
+    const pre = documentRef.createElement('pre')
+    pre.dataset.language = 'json'
+    pre.textContent = source
+    root.append(pre)
+
+    enhanceCodeBlocks(root)
+    assert.equal(pre.textContent, source)
+    assert.equal(tokenizeCode(pre.textContent, 'json').map(token => token.text).join(''), source)
+    assert.deepEqual(await copyFrom(root), [source])
+  }
+})
+
+test('observer restores highlighting after a same-text rewrite and then stays idle', () => {
+  TestMutationObserver.instances = []
+  const documentRef = new TestDocument()
+  const root = documentRef.createElement('main')
+  const pre = documentRef.createElement('pre')
+  pre.dataset.language = 'python'
+  pre.textContent = 'print("Northstar")'
+  root.append(pre)
+  const observer = observeCodeBlocks(root)
+  const code = pre.firstElementChild
+  assert.ok(code.querySelectorAll('.code-token').length > 0)
+
+  const source = code.textContent
+  code.textContent = source
+  assert.equal(code.querySelectorAll('.code-token').length, 0)
+  observer.trigger([{ target: code, addedNodes: Array.from(code.childNodes) }])
+  assert.equal(pre.firstElementChild, code)
+  assert.equal(code.textContent, source)
+  assert.ok(code.querySelectorAll('.code-token').length > 0)
+
+  const renders = code.replaceCount
+  observer.trigger([{ target: code, addedNodes: Array.from(code.childNodes) }])
+  assert.equal(code.replaceCount, renders)
+})
+
+test('enhancement preserves authored siblings and markup beside an existing code node', async () => {
+  for (const annotatedCode of [false, true]) {
+    const documentRef = new TestDocument()
+    const root = documentRef.createElement('main')
+    const pre = documentRef.createElement('pre')
+    pre.dataset.language = 'python'
+    const prompt = documentRef.createElement('span')
+    prompt.setAttribute('data-annotation', 'keep-prompt')
+    prompt.textContent = '>>> '
+    const code = documentRef.createElement('code')
+    const mark = documentRef.createElement('mark')
+    mark.textContent = 'Northstar'
+    if (annotatedCode) code.append(documentRef.createTextNode('print("'), mark, documentRef.createTextNode('")'))
+    else code.textContent = 'print("Northstar")'
+    const note = documentRef.createTextNode(' # keep note')
+    pre.append(prompt, code, note)
+    root.append(pre)
+    const source = pre.textContent
+
+    enhanceCodeBlocks(root)
+    assert.deepEqual(pre.childNodes, [prompt, code, note])
+    assert.equal(prompt.attributes.get('data-annotation'), 'keep-prompt')
+    if (annotatedCode) assert.equal(code.children[0], mark)
+    assert.equal(pre.textContent, source)
+    assert.equal(pre.replaceCount, 0)
+    assert.equal(code.replaceCount, 0)
+    assert.deepEqual(await copyFrom(root), [source])
+  }
+
+  const documentRef = new TestDocument()
+  const root = documentRef.createElement('main')
+  const pre = documentRef.createElement('pre')
+  pre.dataset.language = 'json'
+  const code = documentRef.createElement('code')
+  code.textContent = '{"ready":true}'
+  const annotation = documentRef.createElement('span')
+  annotation.setAttribute('data-annotation', 'keep-empty')
+  pre.append(code, annotation)
+  root.append(pre)
+  enhanceCodeBlocks(root)
+  assert.deepEqual(pre.childNodes, [code, annotation])
+  assert.equal(annotation.attributes.get('data-annotation'), 'keep-empty')
+  assert.equal(pre.textContent, '{"ready":true}')
 })
 
 test('observer rehighlights dynamic JSON once without duplicate wrappers or buttons', () => {

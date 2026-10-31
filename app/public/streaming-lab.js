@@ -445,7 +445,7 @@ const deniedScenario = {
 const interruptedToolId = 'toolu_northstar_003'
 const interruptedScenario = {
   id: 'interrupted',
-  label: 'Timeout or interrupted stream',
+  label: 'Tool confirmation timeout',
   summary: 'A client tool starts after validation and authorization, then the application loses confirmation. The only truthful terminal state is outcome unknown.',
   initialRequest: BASE_REQUEST,
   applicationContext: {
@@ -713,7 +713,7 @@ function applyRawEvent(state, raw) {
       } else {
         state.blocks[raw.index] = { index: raw.index, type: block.type || 'unknown', stopped: false }
       }
-      state.status = block.type === 'tool_use' ? 'assembling' : 'running'
+      if (!state.error) state.status = block.type === 'tool_use' ? 'assembling' : 'running'
       break
     }
     case 'content_block_delta': {
@@ -734,7 +734,7 @@ function applyRawEvent(state, raw) {
           .sort((left, right) => left.index - right.index)
           .map(item => item.text)
           .join('')
-        state.status = 'running'
+        if (!state.error) state.status = 'running'
       } else if (raw.delta?.type === 'input_json_delta') {
         if (block.type !== 'tool_use') {
           setProtocolError(state, `Tool input delta does not match block ${raw.index}.`)
@@ -744,7 +744,7 @@ function applyRawEvent(state, raw) {
         block.parseAttempted = false
         block.parsedInput = null
         block.schemaValid = null
-        state.status = 'assembling'
+        if (!state.error) state.status = 'assembling'
       } else {
         state.notices.push(`Unknown delta type ignored: ${raw.delta?.type || 'missing'}`)
       }
@@ -781,7 +781,7 @@ function applyRawEvent(state, raw) {
           setProtocolError(state, validation.errors.join(' '))
           break
         }
-        state.status = 'proposed'
+        if (!state.error) state.status = 'proposed'
       }
       break
     }
@@ -928,6 +928,7 @@ function applyAction(state, action) {
     case 'human_source_review': {
       state.sourceCheckPassed = action.sourceCheckPassed === true
       state.businessComplete = Boolean(
+        !state.error &&
         action.businessComplete &&
         state.sourceCheckPassed &&
         state.generationComplete
@@ -935,7 +936,6 @@ function applyAction(state, action) {
       state.terminal = true
       if (state.businessComplete) {
         state.status = 'complete'
-        state.error = null
       } else {
         state.status = 'partial-error'
         if (!state.error) state.error = 'The requested business task is incomplete after source review.'
@@ -1033,11 +1033,12 @@ export function mountStreamingLab(host, { onSave, saved } = {}) {
   const scenarioSummary = node(documentRef, 'p')
   const requestDetails = node(documentRef, 'details', '', 'reference')
   const requestSummary = node(documentRef, 'summary', 'Inspect request context and conversation history')
+  const requestLabel = node(documentRef, 'p', '', 'code-label')
   const requestPre = node(documentRef, 'pre', '', 'code')
   const contextPre = node(documentRef, 'pre', '', 'code')
   requestDetails.append(
     requestSummary,
-    node(documentRef, 'p', 'Typed Messages API request', 'code-label'),
+    requestLabel,
     requestPre,
     node(documentRef, 'p', 'Application authorization context. This object is not sent as an API field.', 'code-label'),
     contextPre
@@ -1189,12 +1190,11 @@ export function mountStreamingLab(host, { onSave, saved } = {}) {
     if (typeof onSave === 'function') onSave(snapshot())
   }
 
-  function renderButtons() {
-    scenarioButtons.replaceChildren()
+  function createButtons() {
     for (const scenario of STREAMING_LAB_SCENARIOS) {
       const button = node(documentRef, 'button', scenario.label, 'button secondary')
       button.type = 'button'
-      button.setAttribute('aria-pressed', String(scenario.id === scenarioId))
+      button.dataset.id = scenario.id
       button.addEventListener('click', () => {
         scenarioId = scenario.id
         if (!Number.isFinite(Number(stepByScenario[scenarioId]))) stepByScenario[scenarioId] = 0
@@ -1203,11 +1203,10 @@ export function mountStreamingLab(host, { onSave, saved } = {}) {
       })
       scenarioButtons.append(button)
     }
-    roleButtons.replaceChildren()
     for (const role of Object.values(ROLE_VIEWS)) {
       const button = node(documentRef, 'button', role.label, 'button secondary')
       button.type = 'button'
-      button.setAttribute('aria-pressed', String(role.id === roleId))
+      button.dataset.id = role.id
       button.addEventListener('click', () => {
         roleId = role.id
         save()
@@ -1217,10 +1216,23 @@ export function mountStreamingLab(host, { onSave, saved } = {}) {
     }
   }
 
+  function renderButtons() {
+    for (const button of scenarioButtons.children) {
+      button.setAttribute('aria-pressed', String(button.dataset.id === scenarioId))
+    }
+    for (const button of roleButtons.children) {
+      button.setAttribute('aria-pressed', String(button.dataset.id === roleId))
+    }
+  }
+
   function renderState(state) {
     stateList.replaceChildren()
     stateList.append(
       definition(documentRef, 'Application stage', state.status),
+      definition(documentRef, 'Authorization', state.authorization
+        ? `${state.authorization.authorized ? 'Allowed' : 'Denied'}: ${state.authorization.accountId}. ${state.authorization.reason}`
+        : 'Not checked'),
+      definition(documentRef, 'Application error', state.error || 'None'),
       definition(documentRef, 'Stop reason', state.stopReason || 'Not received'),
       definition(documentRef, 'Stream complete', state.streamComplete ? 'Yes' : 'No'),
       definition(documentRef, 'Business complete', state.businessComplete ? 'Yes, after source review' : 'No'),
@@ -1269,7 +1281,10 @@ export function mountStreamingLab(host, { onSave, saved } = {}) {
       ? `Terminal teaching state: ${state.status}. No automatic retry occurs.`
       : `Current application stage: ${state.status}.`
     scenarioSummary.textContent = scenario.summary
-    requestPre.textContent = stringify(scenario.initialRequest)
+    requestLabel.textContent = state.nextRequest
+      ? 'Follow-up Messages API request with tool_result'
+      : 'Initial Messages API request'
+    requestPre.textContent = stringify(state.nextRequest || scenario.initialRequest)
     contextPre.textContent = stringify(scenario.applicationContext)
     position.textContent = `Step ${index + 1} of ${scenario.steps.length}. This number shows trace position, not runtime progress.`
     stepHeading.textContent = step.title
@@ -1323,6 +1338,7 @@ export function mountStreamingLab(host, { onSave, saved } = {}) {
   })
 
   if (!Number.isFinite(Number(stepByScenario[scenarioId]))) stepByScenario[scenarioId] = 0
+  createButtons()
   render()
 
   return {

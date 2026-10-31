@@ -61,16 +61,41 @@
         },
         {
           "timestamp": "synthetic:T+032ms",
-          "component": "api_transport",
-          "event": "content_block_stop index=0, then message_delta stop_reason=end_turn, then message_stop",
+          "component": "backend_parser",
+          "event": "content_block_stop index=0, then message_delta stop_reason=end_turn, then message_stop"
+        },
+        {
+          "timestamp": "synthetic:T+036ms",
+          "component": "backend_relay",
+          "event": "forwards content_block_stop index=0, message_delta stop_reason=end_turn, then message_stop under opaque-fixture-A"
+        },
+        {
+          "timestamp": "synthetic:T+040ms",
+          "component": "browser_network",
+          "event": "receives content_block_stop index=0, message_delta stop_reason=end_turn, then message_stop under opaque-fixture-A"
+        },
+        {
+          "timestamp": "synthetic:T+044ms",
+          "component": "backend_parser",
+          "event": "observes upstream EOF after parsing message_stop under opaque-fixture-A"
+        },
+        {
+          "timestamp": "synthetic:T+048ms",
+          "component": "backend_relay",
+          "event": "closes the downstream stream after forwarding message_stop under opaque-fixture-A"
+        },
+        {
+          "timestamp": "synthetic:T+052ms",
+          "component": "browser_network",
+          "event": "observes downstream EOF after receiving message_stop under opaque-fixture-A",
           "excerpt_status": "complete synthetic reference sequence ends"
         }
       ],
-      "last_confirmed_boundary": "The UI rendered Renewal and the stream ended with message_stop.",
+      "last_confirmed_boundary": "The UI rendered Renewal once. The backend parsed the terminal events, the relay forwarded them, and the browser received message_stop before downstream EOF.",
       "next_discriminating_check": "Compare the backend delta list, browser delta list, and rendered text under opaque-fixture-A.",
-      "expected_reference_result": "The visible text is exactly Renewal. Ren and ewal each appear once. message_stop establishes a protocol ending. In this text-only fixture, end_turn and the expected visible content support normal answer completion. No business action is implied.",
+      "expected_reference_result": "The visible text is exactly Renewal. Ren and ewal each appear once. The backend parser records content_block_stop and end_turn followed by message_stop. The relay forwards that sequence, and the browser receives it before EOF. In this text-only synthetic fixture, these observed boundaries and the expected visible text support normal answer completion. No business action is implied.",
       "recovery": "No recovery is needed. If the strings differ, stop at the first component whose output differs from its input.",
-      "verification": "Confirm one ordered append per text_delta, content_block_stop for index 0, end_turn, and message_stop.",
+      "verification": "Under opaque-fixture-A, confirm one ordered UI append per text_delta. Check the backend parser's content_block_stop for index 0, message_delta stop_reason=end_turn, and message_stop. Match the relay's forwarding row to the browser's receipt row. Confirm upstream EOF follows parsed message_stop and downstream EOF follows browser receipt of message_stop.",
       "optional_changed_case": "Swap the delta arrival order. The learner should detect an ordering fault rather than repair the word by guessing.",
       "no_paid_call_required": true,
       "app_trace_id": "opaque-fixture-A",

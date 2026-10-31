@@ -542,7 +542,7 @@ test('derives streaming question context from the canonical trace module', async
 
   const payload = JSON.parse(providerCall.options.body)
   const prompt = payload.messages[0].content[0].text
-  assert.match(prompt, /Scenario: Timeout or interrupted stream \(interrupted\)/)
+  assert.match(prompt, /Scenario: Tool confirmation timeout \(interrupted\)/)
   assert.match(prompt, /Streaming role: Engineer/)
   assert.match(prompt, /Current zero-based step: 7 of 14/)
   assert.match(prompt, /Current title: First tool JSON fragment arrives/)
@@ -623,7 +623,7 @@ test('keeps live Ask context separate from prepared replay state and current run
   assert.match(prompt, /synthetic teaching identity/)
   assert.match(prompt, /HTTP 200 and visible text do not prove completion/)
   assert.match(prompt, /no current draft, SSE event, trace ID, provider request ID, run receipt, tool receipt, or completion state/)
-  assert.equal(prompt.includes('Scenario: Timeout or interrupted stream'), false)
+  assert.equal(prompt.includes('Scenario: Tool confirmation timeout'), false)
 
   for (const context of [
     { route: 'streaming', stream_mode: 'live' },
