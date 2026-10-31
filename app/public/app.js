@@ -9,10 +9,11 @@ import { mountStreamingLab } from './streaming-lab.js?v=20261025-rename'
 import { mountLiveWorkflow } from './live-workflow.js?v=learning-context-3'
 import { mountNativeIntegration } from './native-integration.js?v=learning-context-3'
 const githubRef = '75ba253996e7da32a9a7bdbfd3096d575b0bc3fe'
+const updatedGuidesRef = 'c0ffcb96053c3405fc2b48c1854fe0c331b006de'
 const nativeIntegrationRef = 'c74acd400dbb05243116993ada98f23349616549'
 const githubRoot = 'https://github.com/cfregly/learn-claude-workshop'
 const githubFile = path => `${githubRoot}/blob/${githubRef}/${path}`
-const nativeGuideUrl = `${githubRoot}/blob/${nativeIntegrationRef}/docs/skills-tools-example.md`
+const nativeGuideUrl = `${githubRoot}/blob/${updatedGuidesRef}/docs/skills-tools-example.md`
 const nativeBundleUrl = `${githubRoot}/tree/${nativeIntegrationRef}/labs/skills/renewal-brief`
 
 const main = document.querySelector('#main')
@@ -300,7 +301,7 @@ function renderLesson(id, rawStep, requestedMode) {
   if (step===2) {mountIntegrationArtifacts(path);if(hasInlineLiveDemo(path))mountLessonDemo(path,activeLessonDemoMode);else mountLiveDemo(document.querySelector('#live-demo'),path)}
 }
 
-const traceCode = `# Excerpt from the runnable offline notebook\ndef prepare_request(employee, account_id):\n    if account_id not in employee["allowed_accounts"]:\n        raise PermissionError("Account access denied")\n    facts = approved_records[account_id]\n    return {\n        "model": "ACCOUNT_ENABLED_MODEL",\n        "max_tokens": 350,\n        "system": "Use only supplied facts. Keep unknowns visible.",\n        "messages": [{"role": "user", "content": facts}]\n    }\n\n# Access is checked BEFORE adding account facts.\nrequest = prepare_request(employee, "northstar")\nresponse = {"content": [{"type": "text",\n    "text": "12% discussed. Approval is not recorded."}],\n    "stop_reason": "end_turn"}\ntext = "".join(b["text"] for b in response["content"]\n               if b["type"] == "text")`
+const traceCode = `# Prepared illustration of the notebook access boundary\ndef prepare_request(employee, account_id):\n    if account_id not in employee["allowed_accounts"]:\n        raise PermissionError("Account access denied")\n    facts = approved_records[account_id]\n    return {\n        "model": "ACCOUNT_ENABLED_MODEL",\n        "max_tokens": 350,\n        "system": "Use only supplied facts. Keep unknowns visible.",\n        "messages": [{"role": "user", "content": facts}]\n    }\n\n# Access is checked BEFORE adding account facts.\nrequest = prepare_request(employee, "northstar")\nresponse = {"content": [{"type": "text",\n    "text": "12% discussed. Approval is not recorded."}],\n    "stop_reason": "end_turn"}\ntext = "".join(b["text"] for b in response["content"]\n               if b["type"] == "text")`
 function routeExercise() {
   if (activeRoute === 'engineer') return `<div><h2>Trace the integration</h2><p>Follow the notebook from approved records to a response. Find the application check that protects account access.</p><ol><li>Point to the check that runs before account facts enter the request.</li><li>Name the request fields and the text content in the response.</li><li>Explain why a completed API call does not approve the discount.</li></ol><pre class="code">${esc(traceCode)}</pre><p class="code-label">Prepared working trace. No network or model call.</p><a class="button secondary" href="#material/notebook">Open the runnable notebook</a><form id="engineer-trace-form" class="spaced"><h3>Your evidence for the checkpoint</h3><label class="exercise-label" for="trace-access">Where is account access checked, and why there?</label><textarea id="trace-access" name="access" data-group-trace="access" rows="2" maxlength="2000" required>${esc(state.groupTrace?.access||'')}</textarea><label class="exercise-label" for="trace-request">Name a request field and the response field that holds text.</label><textarea id="trace-request" name="request" data-group-trace="request" rows="2" maxlength="2000" required>${esc(state.groupTrace?.request||'')}</textarea><label class="exercise-label" for="trace-denial">If Northstar is excluded from allowed_accounts, what reaches Claude?</label><textarea id="trace-denial" name="denial" data-group-trace="denial" rows="2" maxlength="2000" required>${esc(state.groupTrace?.denial||'')}</textarea><p class="small muted">Your response stays in this browser and is included in the learning record export.</p><button class="button secondary" type="submit">Save for the checkpoint</button><p id="trace-result" role="status"></p></form><details class="reference"><summary>Working reference</summary><p>The allowlist check raises an error before approved_records is read. The request carries model, max_tokens, system instructions, and a user message. The response has typed text content and an end_turn stop reason. Discount approval still requires evidence from the account's approval process.</p></details></div><aside><h3>Prepared extension</h3><p class="small">Change the employee's allowed account list to exclude Northstar. Predict whether any account facts reach Claude. Then use the offline notebook to test your prediction.</p><details class="reference"><summary>Extension reference</summary><p>A PermissionError stops request creation. No customer context is sent. A Claude API credential authorizes invocation, while the application authorizes the employee's account access.</p></details><h3 class="spaced">Bring back one explanation</h3><p class="small">Where is access checked, and why must it happen there?</p></aside>`
   return `<div><h2>Check the customer claims</h2><p>Compare this prepared draft with the source notes. Decide which claims you could use and which need correction.</p><div class="notice warning"><strong>Draft to inspect</strong><p class="no-margin">Northstar renews January 31, 2027. Maya Chen owns the account. Its 12% discount is approved and SSO is included. Lower usage proves the open email issue caused churn risk.</p></div><form id="claims-form"><h3>Select every supported claim</h3>${[['renewal','The renewal is January 31, 2027.'],['owner','Maya Chen is the account owner.'],['discount','The 12% discount is approved.'],['sso','SSO is included in the package.'],['cause','The email issue caused the usage decline.']].map(([id,label])=>`<label class="quiz-option"><input type="checkbox" name="claim" value="${id}">${label}</label>`).join('')}<button class="button secondary" type="submit">Check the evidence</button><div id="claims-result" aria-live="polite"></div></form><details class="reference"><summary>Source-checked reference brief</summary><p>Northstar Freight renews January 31, 2027, and Maya Chen owns the account [CRM]. A 12% discount was discussed, but approval is not recorded [call notes]. SSO entitlement and the security follow-up owner remain unknown [call notes]. Case 4821 is open [support]. Weekly active users fell from 78 to 64, with no recorded cause [usage]. Proposed next step: ask the account team to resolve the missing information before preparing a customer commitment.</p></details></div><aside><h3>Your source notes</h3>${sourceSummary()}<h3 class="spaced">Bring back one conclusion</h3><p class="small">Which customer claim is supported, and which source supports it? What must remain unknown?</p><details class="reference"><summary>Optional changed assumption</summary><p>A new note says “discount approved” but names no approver. What changes?</p><details><summary>Check your answer</summary><p>Keep approval unresolved. Ask for the approval record and authorized approver. A new assertion is not the missing approval evidence.</p></details></details></aside>`
@@ -322,24 +323,24 @@ function questionList() { return state.questions.length ? state.questions.map((q
 function materialLink(file) {
   const links = {
     'northstar-source-pack.md':['source-pack','docs/northstar-source-pack.md'],
-    'api-trace.ipynb':['notebook','labs/api-trace.ipynb'],
-    'claude_api_demo.py':['api-client','labs/claude_api_demo.py'],
-    'northstar-renewals.zip':['renewal-code','labs/northstar-renewals/starter'],
+    'api-trace.ipynb':['notebook','labs/api-trace.ipynb',updatedGuidesRef],
+    'claude_api_demo.py':['api-client','labs/claude_api_demo.py',updatedGuidesRef],
+    'northstar-renewals.zip':['renewal-code','labs/northstar-renewals/starter',updatedGuidesRef],
     'source-fixtures.json':['fixtures','labs/source-fixtures.json'],
-    'facilitator-guide.md':['facilitator','docs/facilitator-guide.md'],
-    'security-workshop.md':['security','docs/security-workshop.md'],
-    'claude-for-work.md':['claude-for-work','docs/claude-for-work.md'],
-    'incomplete-response.md':['incomplete-response','docs/incomplete-response.md'],
-    'streaming-lab.md':['streaming-lab','docs/streaming-lab.md'],
+    'facilitator-guide.md':['facilitator','docs/facilitator-guide.md',updatedGuidesRef],
+    'security-workshop.md':['security','docs/security-workshop.md',updatedGuidesRef],
+    'claude-for-work.md':['claude-for-work','docs/claude-for-work.md',updatedGuidesRef],
+    'incomplete-response.md':['incomplete-response','docs/incomplete-response.md',updatedGuidesRef],
+    'streaming-lab.md':['streaming-lab','docs/streaming-lab.md',updatedGuidesRef],
     'thinking-lab.md':['thinking-lab','docs/thinking-lab.md'],
     'model-capabilities.json':['model-capabilities','docs/model-capabilities.json'],
     'supporting-features.md':['supporting-features','docs/supporting-features.md'],
     'diagnostic-instructor-guide.md':['diagnostic-instructor-guide','docs/diagnostic-instructor-guide.md'],
     'diagnostics-lab.js':['diagnose','labs/diagnostics/diagnostics-lab.js'],
     'hooks-lab.md':['hooks-lab','docs/hooks-lab.md'],
-    'live-stream-tool-demo.md':['live-stream-tool','docs/live-stream-tool-demo.md'],
-    'live-stream-tool-demo.py':['live-stream-tool-code','labs/live-stream-tool-demo.py'],
-    'skills-tools-example.md':['native-integration','docs/skills-tools-example.md',nativeIntegrationRef]
+    'live-stream-tool-demo.md':['live-stream-tool','docs/live-stream-tool-demo.md',updatedGuidesRef],
+    'live-stream-tool-demo.py':['live-stream-tool-code','labs/live-stream-tool-demo.py',updatedGuidesRef],
+    'skills-tools-example.md':['native-integration','docs/skills-tools-example.md',updatedGuidesRef]
   }
   const [slug,path,ref=githubRef] = links[file]
   return {slug,url:file.endsWith('.zip')?`${githubRoot}/tree/${ref}/${path}`:`${githubRoot}/blob/${ref}/${path}`}
@@ -357,7 +358,7 @@ function materials() {
     ['When a draft stops early','An annotated API trace for engineers and an unfinished brief for sales managers. Both routes test completion and source support.','incomplete-response.md','Read the example'],
     ['Claude for Work activity','Set up a private Project, copy a role-specific task, and review the result against the four supplied records.','claude-for-work.md','Read the activity'],
     ['Northstar source pack','Four synthetic records with facts, source labels, unknowns, and a reviewable reference brief.','northstar-source-pack.md','Download the source pack'],
-    ['Engineer notebook','Run the request, access check, typed response, streaming trace, and failure exercises offline. No API key or package installation is required.','api-trace.ipynb','Download the notebook'],
+    ['Engineer notebook','Prepared Markdown and code, saved without outputs. Nothing runs in this browser.','api-trace.ipynb','Download the notebook'],
     ['Direct Claude API client','Use your own approved environment and Claude Platform API key for a real request. The client defaults to an offline dry run and requires an explicit live flag.','claude_api_demo.py','Download the API client'],
     ['Claude Code practice repository','A small renewal-window defect, acceptance criteria, tests, and a separate reference solution.','northstar-renewals.zip','Download the practice repository'],
     ['Four evaluation fixtures','Baseline records, a conflicting date, a false SSO claim, and an untrusted instruction in the source context.','source-fixtures.json','Download the fixtures'],

@@ -1,6 +1,6 @@
 const REPO = 'https://github.com/cfregly/learn-claude-workshop'
 const NATIVE_REF = 'c74acd400dbb05243116993ada98f23349616549'
-const NATIVE_GUIDE_REF = '50dc8a10728ec3f1df33200ce60ced8494429c5d'
+const UPDATED_GUIDES_REF = 'c0ffcb96053c3405fc2b48c1854fe0c331b006de'
 const renders = new WeakMap()
 let readerSession = null
 
@@ -8,22 +8,27 @@ const materials = {
   'native-integration': {
     title: 'MCP context and a runnable Skill',
     description: 'Read the prepared guide alongside the live integration. Keep source records, Skill instructions, and runtime receipts distinct.',
-    local: '/materials/skills-tools-example.md', github: 'docs/skills-tools-example.md', githubRef: NATIVE_GUIDE_REF, kind: 'markdown'
+    local: '/materials/skills-tools-example.md', github: 'docs/skills-tools-example.md', githubRef: UPDATED_GUIDES_REF, kind: 'markdown'
   },
   'native-integration-code': {
     title: 'Renewal brief Skill bundle',
     description: 'Read the instructions, output contract, and Python scripts used by the native integration.',
     local: '/materials/native-renewal-brief/SKILL.md', github: 'labs/skills/renewal-brief', githubRef: NATIVE_REF, kind: 'skill', tree: true
   },
+  'native-integration-setup': {
+    title: 'Standalone native Skill setup',
+    description: 'Install the standalone lab, run its offline checks, and review the separate upload and execution steps.',
+    local: '/materials/native-renewal-brief-README.md', github: 'labs/skills/renewal-brief/README.md', githubRef: UPDATED_GUIDES_REF, kind: 'markdown'
+  },
   'live-stream-tool': {
     title: 'Live streaming and a read-only lookup',
     description: 'Run the real Northstar tool round trip, stream the draft, and keep generation separate from source review.',
-    local: '/materials/live-stream-tool-demo.md', github: 'docs/live-stream-tool-demo.md', kind: 'markdown'
+    local: '/materials/live-stream-tool-demo.md', github: 'docs/live-stream-tool-demo.md', githubRef: UPDATED_GUIDES_REF, kind: 'markdown'
   },
   'live-stream-tool-code': {
     title: 'Runnable streaming and tool client',
     description: 'A Python SDK exercise with an offline default and an explicit live streaming mode.',
-    local: '/materials/live-stream-tool-demo.py', github: 'labs/live-stream-tool-demo.py', kind: 'python'
+    local: '/materials/live-stream-tool-demo.py', github: 'labs/live-stream-tool-demo.py', githubRef: UPDATED_GUIDES_REF, kind: 'python'
   },
   'hooks-lab': {
     title: 'Before and after an account action',
@@ -43,7 +48,7 @@ const materials = {
   'renewal-skill': {
     title: 'Renewal brief Skill',
     description: 'A reviewed procedure with when-to-use metadata, source checks, a learning check, and a changed case.',
-    local: '/materials/renewal-brief/SKILL.md', github: 'labs/skills/renewal-brief/SKILL.md', kind: 'markdown'
+    local: '/materials/renewal-brief/SKILL.md', github: 'app/public/materials/renewal-brief/SKILL.md', githubRef: UPDATED_GUIDES_REF, kind: 'markdown'
   },
   'supporting-features': {
     title: 'Extend the renewal workflow',
@@ -63,17 +68,17 @@ const materials = {
   'streaming-lab': {
     title: 'Claude API event lab reference',
     description: 'An annotated tool cycle, truthful progress states, failure drills, and checks for engineers, sales, and product.',
-    local: '/materials/streaming-lab.md', github: 'docs/streaming-lab.md', kind: 'markdown'
+    local: '/materials/streaming-lab.md', github: 'docs/streaming-lab.md', githubRef: UPDATED_GUIDES_REF, kind: 'markdown'
   },
   'claude-for-work': {
     title: 'Claude for Work activity',
     description: 'Set up a private Project, use the synthetic records, and complete the task for your role.',
-    local: '/materials/claude-for-work.md', github: 'docs/claude-for-work.md', kind: 'markdown'
+    local: '/materials/claude-for-work.md', github: 'docs/claude-for-work.md', githubRef: UPDATED_GUIDES_REF, kind: 'markdown'
   },
   'incomplete-response': {
     title: 'When a draft stops early',
     description: 'One failure taught through an annotated API trace and a source-checked business brief.',
-    local: '/materials/incomplete-response.md', github: 'docs/incomplete-response.md', kind: 'markdown'
+    local: '/materials/incomplete-response.md', github: 'docs/incomplete-response.md', githubRef: UPDATED_GUIDES_REF, kind: 'markdown'
   },
   'source-pack': {
     title: 'Northstar source pack',
@@ -83,17 +88,17 @@ const materials = {
   facilitator: {
     title: 'Facilitator guide',
     description: 'Agendas, recovery options, teach-back prompts, and return points for a working session.',
-    local: '/materials/facilitator-guide.md', github: 'docs/facilitator-guide.md', kind: 'markdown'
+    local: '/materials/facilitator-guide.md', github: 'docs/facilitator-guide.md', githubRef: UPDATED_GUIDES_REF, kind: 'markdown'
   },
   security: {
     title: 'Security and regulated workflows',
     description: 'A prepared review of data boundaries, permissions, retention, failure handling, and cost.',
-    local: '/materials/security-workshop.md', github: 'docs/security-workshop.md', kind: 'markdown'
+    local: '/materials/security-workshop.md', github: 'docs/security-workshop.md', githubRef: UPDATED_GUIDES_REF, kind: 'markdown'
   },
   'api-client': {
     title: 'Direct Claude API client',
     description: 'A dry-run-first Python client for use in your own approved environment.',
-    local: '/materials/claude_api_demo.py', github: 'labs/claude_api_demo.py', kind: 'python'
+    local: '/materials/claude_api_demo.py', github: 'labs/claude_api_demo.py', githubRef: UPDATED_GUIDES_REF, kind: 'python'
   },
   fixtures: {
     title: 'Evaluation fixtures',
@@ -102,13 +107,13 @@ const materials = {
   },
   notebook: {
     title: 'Engineer notebook',
-    description: 'Prepared Markdown, code, and saved text output. Nothing runs in this browser.',
-    local: '/materials/api-trace.ipynb', github: 'labs/api-trace.ipynb', kind: 'notebook'
+    description: 'Prepared Markdown and code, saved without outputs. Nothing runs in this browser.',
+    local: '/materials/api-trace.ipynb', github: 'labs/api-trace.ipynb', githubRef: UPDATED_GUIDES_REF, kind: 'notebook'
   },
   'renewal-code': {
     title: 'Claude Code practice repository',
     description: 'Read the starter files inline, then open the reference notes or solution only when useful.',
-    local: '/materials/northstar-renewals.zip', github: 'labs/northstar-renewals/starter', kind: 'renewal', tree: true
+    local: '/materials/northstar-renewals.zip', github: 'labs/northstar-renewals/starter', githubRef: UPDATED_GUIDES_REF, kind: 'renewal', tree: true
   }
 }
 
@@ -165,6 +170,7 @@ export function materialIdForHref(value, { repository = false } = {}) {
   const url = new URL(href)
   if (repository && url.origin === 'https://github.com' && url.pathname.startsWith('/cfregly/learn-claude-workshop/')) {
     const path = url.pathname.replace(/^\/cfregly\/learn-claude-workshop\/(?:blob|tree)\/[^/]+\//, '')
+    if (path === materials['native-integration-setup'].github) return 'native-integration-setup'
     if (/^labs\/skills\/renewal-brief(?:\/|$)/.test(path)) return 'native-integration-code'
     const entry = Object.entries(materials).find(([, material]) => material.github === path)
     return entry?.[0] || null

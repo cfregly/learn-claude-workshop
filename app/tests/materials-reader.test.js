@@ -398,6 +398,74 @@ test('prepared native bundle reads local files and GitHub originals use normal n
   }
 })
 
+test('the native Skill README routes to setup before the pinned bundle', t => {
+  setup(t)
+  const repository = 'https://github.com/cfregly/learn-claude-workshop'
+  for (const ref of ['c0ffcb96053c3405fc2b48c1854fe0c331b006de', 'c74acd400dbb05243116993ada98f23349616549']) {
+    assert.equal(materialIdForHref(`${repository}/blob/${ref}/labs/skills/renewal-brief/README.md`, { repository: true }), 'native-integration-setup')
+    assert.equal(materialIdForHref(`${repository}/tree/${ref}/labs/skills/renewal-brief`, { repository: true }), 'native-integration-code')
+    for (const file of ['SKILL.md', 'references/OUTPUT_CONTRACT.md', 'scripts/contract.py', 'scripts/render_brief.py']) {
+      assert.equal(materialIdForHref(`${repository}/blob/${ref}/labs/skills/renewal-brief/${file}`, { repository: true }), 'native-integration-code')
+    }
+  }
+  assert.equal(materialIdForHref('/materials/native-renewal-brief-README.md'), 'native-integration-setup')
+  assert.equal(materialIdForHref('#material/native-integration-setup'), 'native-integration-setup')
+  assert.equal(materialIdForHref('https://github.com/another-owner/learn-claude-workshop/blob/main/labs/skills/renewal-brief/README.md', { repository: true }), null)
+})
+
+test('the native guide opens the standalone README inline and keeps the native bundle pinned', async t => {
+  const guide = await readFile(new URL('../public/materials/skills-tools-example.md', import.meta.url), 'utf8')
+  const urls = []
+  const { document } = setup(t, async url => {
+    urls.push(url)
+    return new Response(url.endsWith('/skills-tools-example.md') ? guide : '')
+  })
+  await openMaterialReader('native-integration', { githubRef: 'unrelated-material-ref' })
+  let dialog = document.querySelector('dialog')
+  const setupLink = find(dialog, node => node.tagName === 'A' && node.textContent === 'Skill lab')
+  assert.equal(setupLink.href, '#material/native-integration-setup')
+  assert.equal(setupLink.dataset.materialFileTarget, undefined)
+  assert.equal(setupLink.click().defaultPrevented, true)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.match(urls.at(-1), /\/materials\/native-renewal-brief-README\.md$/)
+  dialog = document.querySelector('dialog')
+  assert.equal(find(dialog, node => node.tagName === 'A' && node.textContent === 'View original on GitHub').href,
+    'https://github.com/cfregly/learn-claude-workshop/blob/c0ffcb96053c3405fc2b48c1854fe0c331b006de/labs/skills/renewal-brief/README.md')
+  await openMaterialReader('native-integration-code')
+  assert.match(urls.at(-1), /\/materials\/native-renewal-brief\/SKILL\.md$/)
+  assert.equal(find(dialog, node => node.tagName === 'A' && node.textContent === 'View original on GitHub').href,
+    'https://github.com/cfregly/learn-claude-workshop/tree/c74acd400dbb05243116993ada98f23349616549/labs/skills/renewal-brief')
+})
+
+test('updated guide refs leave unrelated material refs unchanged', async t => {
+  const { document } = setup(t)
+  const container = document.createElement('main')
+  document.body.append(container)
+  for (const [slug, path, tree = false] of [
+    ['native-integration', 'docs/skills-tools-example.md'],
+    ['native-integration-setup', 'labs/skills/renewal-brief/README.md'],
+    ['renewal-skill', 'app/public/materials/renewal-brief/SKILL.md'],
+    ['facilitator', 'docs/facilitator-guide.md'],
+    ['security', 'docs/security-workshop.md'],
+    ['live-stream-tool', 'docs/live-stream-tool-demo.md'],
+    ['live-stream-tool-code', 'labs/live-stream-tool-demo.py'],
+    ['api-client', 'labs/claude_api_demo.py'],
+    ['notebook', 'labs/api-trace.ipynb'],
+    ['claude-for-work', 'docs/claude-for-work.md'],
+    ['incomplete-response', 'docs/incomplete-response.md'],
+    ['renewal-code', 'labs/northstar-renewals/starter', true],
+    ['streaming-lab', 'docs/streaming-lab.md']
+  ]) {
+    await renderMaterial(container, slug, { githubRef: 'unrelated-material-ref' })
+    assert.equal(find(container, node => node.tagName === 'A' && node.textContent === 'View original on GitHub').href,
+      `https://github.com/cfregly/learn-claude-workshop/${tree ? 'tree' : 'blob'}/c0ffcb96053c3405fc2b48c1854fe0c331b006de/${path}`)
+  }
+  assert.equal(materialIdForHref('https://github.com/cfregly/learn-claude-workshop/blob/c0ffcb96053c3405fc2b48c1854fe0c331b006de/app/public/materials/renewal-brief/SKILL.md', { repository: true }), 'renewal-skill')
+  await renderMaterial(container, 'source-pack', { githubRef: 'unrelated-material-ref' })
+  assert.equal(find(container, node => node.tagName === 'A' && node.textContent === 'View original on GitHub').href,
+    'https://github.com/cfregly/learn-claude-workshop/blob/unrelated-material-ref/docs/northstar-source-pack.md')
+})
+
 test('direct material routes retain their existing route-bound rendering', async t => {
   const { document } = setup(t)
   const container = document.createElement('main')
