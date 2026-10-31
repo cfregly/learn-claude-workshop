@@ -122,7 +122,7 @@ const output = Object.freeze({
   })
 })
 
-function createFakeNative({ uploadRequired = true, failAfterFirstStart = false, proofFailure = false, gate = null, entered = null } = {}) {
+function createFakeNative({ uploadRequired = true, failAfterFirstStart = false, uploadRecovery = null, proofFailure = false, gate = null, entered = null } = {}) {
   const state = { runs: 0, providerStarts: 0 }
   const callsRequired = uploadRequired ? 2 : 1
   return {
@@ -167,7 +167,8 @@ function createFakeNative({ uploadRequired = true, failAfterFirstStart = false, 
               evidence_state: 'mcp_observed',
               provider_calls_started: 1,
               provider_calls: null,
-              provider_request_ids: ['req_skill_unknown']
+              provider_request_ids: ['req_skill_unknown'],
+              ...(uploadRecovery ? { upload_recovery: uploadRecovery } : {})
             }
           })
         }
@@ -366,6 +367,35 @@ test('native admission rejects extra input and refunds only the unstarted provid
   assert.equal(receipt.retry_attempted, false)
 })
 
+test('native upload failure retains only bounded recovery IDs without claiming a confirmed pin', async () => {
+  const state = await temporaryState()
+  const native = createFakeNative({
+    failAfterFirstStart: true,
+    uploadRecovery: {
+      operation: 'create_skill', provider_request_id: 'req_skill_unknown',
+      returned: { id: 'skill_returned', latest_version_id: 'version_returned', name: 'sk-ant-never-store', raw_secret: 'private-value' },
+      raw_response: { credential: 'private-value' }, pin_file: '/private/secret-path'
+    }
+  })
+  const origin = await startServer(configuredOptions(state, native))
+  const events = await readSse(await nativePost(origin, { role_id: 'software-engineer-api' }))
+  const failure = events.at(-1)
+  assert.equal(failure.event, 'error')
+  assert.equal(failure.data.evidence_state, 'mcp_observed')
+  assert.equal(events.some(event => event.event === 'skill_pinned' || event.event === 'complete'), false)
+  assert.deepEqual(failure.data.upload_recovery, {
+    status: 'requires_reconciliation', operation: 'create_skill', provider_request_id: 'req_skill_unknown',
+    returned: { id: 'skill_returned', latest_version_id: 'version_returned' },
+    retry_attempted: false, raw_response_persisted: false
+  })
+  const receiptText = await readFile(state.receiptFile, 'utf8')
+  const receipt = JSON.parse(receiptText)
+  assert.deepEqual(receipt.upload_recovery, failure.data.upload_recovery)
+  for (const forbidden of ['private-value', 'secret-path', 'sk-ant-never-store']) assert.equal(receiptText.includes(forbidden), false)
+  assert.equal(native.state.providerStarts, 1)
+  assert.equal(JSON.parse(await readFile(state.budgetFile, 'utf8')).count, 1)
+})
+
 test('native proof failure keeps bounded provider diagnostics without claiming completion', async () => {
   const state = await temporaryState()
   const native = createFakeNative({ uploadRequired: false, proofFailure: true })
@@ -476,6 +506,159 @@ test('native execution occupies the shared concurrency gate and the same client 
   assert.equal((await cooldown.json()).code, 'client_cooldown')
   assert.equal(unexpectedFetch, false)
 })
+
+test('native planning applies the client cooldown before its first await', async () => {
+  const state = await temporaryState()
+  const native = createFakeNative()
+  const planGate = deferred()
+  const planEntered = deferred()
+  const readyPlan = native.plan.bind(native)
+  let planCalls = 0
+  native.plan = async () => {
+    planCalls += 1
+    if (planCalls === 1) {
+      planEntered.resolve()
+      await planGate.promise
+    }
+    return readyPlan()
+  }
+  const liveDemo = createLiveDemo(configuredOptions(state, native, { cooldownMs: 4_000 }))
+  const first = liveDemo.handleNativeIntegration(directNativeRequest({ role_id: 'software-engineer-api' }))
+  await planEntered.promise
+  let overlapping
+  try {
+    overlapping = await liveDemo.handleNativeIntegration(directNativeRequest({ role_id: 'account-executive' }))
+    assert.equal(overlapping.statusCode, 429)
+    assert.equal(overlapping.body.code, 'client_cooldown')
+    assert.equal(planCalls, 1)
+  } finally {
+    planGate.resolve()
+    for (const result of [await first, overlapping]) {
+      if (result?.stream) await result.start(closedNativeResponse())
+    }
+  }
+  assert.equal(native.state.runs, 0)
+  assert.equal(native.state.providerStarts, 0)
+  assert.equal(JSON.parse(await readFile(state.budgetFile, 'utf8')).count, 0)
+})
+
+test('pending native plans occupy the shared two-run gate', async () => {
+  const state = await temporaryState()
+  const native = createFakeNative()
+  const planGate = deferred()
+  const plansEntered = [deferred(), deferred()]
+  const readyPlan = native.plan.bind(native)
+  let planCalls = 0
+  native.plan = async () => {
+    const index = planCalls++
+    if (index < plansEntered.length) {
+      plansEntered[index].resolve()
+      await planGate.promise
+    }
+    return readyPlan()
+  }
+  const liveDemo = createLiveDemo(configuredOptions(state, native, { maxConcurrentCalls: 2 }))
+  const first = liveDemo.handleNativeIntegration(directNativeRequest({ role_id: 'software-engineer-api' }, '203.0.113.81'))
+  await plansEntered[0].promise
+  const second = liveDemo.handleNativeIntegration(directNativeRequest({ role_id: 'account-executive' }, '203.0.113.82'))
+  await plansEntered[1].promise
+  let extraNative
+  let extraWorkflow
+  try {
+    extraNative = await liveDemo.handleNativeIntegration(directNativeRequest({ role_id: 'account-executive' }, '203.0.113.83'))
+    extraWorkflow = await liveDemo.handleWorkflow(directNativeRequest({ role_id: 'account-executive' }, '203.0.113.84'))
+    for (const blocked of [extraNative, extraWorkflow]) {
+      assert.equal(blocked.statusCode, 429)
+      assert.equal(blocked.body.code, 'live_demo_busy')
+    }
+    assert.equal(planCalls, 2)
+  } finally {
+    planGate.resolve()
+    for (const result of [await first, await second, extraNative, extraWorkflow]) {
+      if (result?.stream) await result.start(closedNativeResponse())
+    }
+  }
+  assert.equal(native.state.runs, 0)
+  assert.equal(native.state.providerStarts, 0)
+  assert.equal(JSON.parse(await readFile(state.budgetFile, 'utf8')).count, 0)
+})
+
+test('a failed older native plan preserves a newer client cooldown', async () => {
+  const state = await temporaryState()
+  const native = createFakeNative()
+  const planGate = deferred()
+  const planEntered = deferred()
+  const readyPlan = native.plan.bind(native)
+  let timestamp = Date.parse('2026-10-26T12:00:00Z')
+  let planCalls = 0
+  native.plan = async () => {
+    planCalls += 1
+    if (planCalls === 1) {
+      planEntered.resolve()
+      await planGate.promise
+      return { enabled: false, reason: 'runtime_dependencies_missing' }
+    }
+    return readyPlan()
+  }
+  const liveDemo = createLiveDemo(configuredOptions(state, native, {
+    maxConcurrentCalls: 2,
+    cooldownMs: 4_000,
+    now: () => timestamp
+  }))
+  const older = liveDemo.handleNativeIntegration(directNativeRequest({ role_id: 'software-engineer-api' }))
+  await planEntered.promise
+  timestamp += 5_000
+  const newer = await liveDemo.handleNativeIntegration(directNativeRequest({ role_id: 'account-executive' }))
+  try {
+    assert.equal(newer.stream, true)
+  } finally {
+    if (newer.stream) await newer.start(closedNativeResponse())
+    planGate.resolve()
+    await older
+  }
+  const cooldown = await liveDemo.handleNativeIntegration(directNativeRequest({ role_id: 'account-executive' }))
+  try {
+    assert.equal(cooldown.statusCode, 429)
+    assert.equal(cooldown.body.code, 'client_cooldown')
+  } finally {
+    if (cooldown.stream) await cooldown.start(closedNativeResponse())
+  }
+  assert.equal(native.state.providerStarts, 0)
+})
+
+for (const failure of ['disabled', 'throws']) {
+  test(`native plan ${failure} releases admission and client cooldown without spending budget`, async () => {
+    const state = await temporaryState()
+    const native = createFakeNative()
+    const readyPlan = native.plan.bind(native)
+    let planCalls = 0
+    native.plan = async () => {
+      planCalls += 1
+      if (planCalls === 1) {
+        if (failure === 'throws') throw new Error('offline plan failure')
+        return { enabled: false, reason: 'runtime_dependencies_missing' }
+      }
+      return readyPlan()
+    }
+    const liveDemo = createLiveDemo(configuredOptions(state, native, {
+      maxConcurrentCalls: 1,
+      cooldownMs: 4_000
+    }))
+    const failed = await liveDemo.handleNativeIntegration(directNativeRequest({ role_id: 'software-engineer-api' }))
+    assert.equal(failed.statusCode, 503)
+    assert.equal(failed.body.code, 'runtime_dependencies_missing')
+    await assert.rejects(readFile(state.budgetFile), { code: 'ENOENT' })
+    const retry = await liveDemo.handleNativeIntegration(directNativeRequest({ role_id: 'account-executive' }))
+    try {
+      assert.equal(retry.stream, true)
+    } finally {
+      if (retry.stream) await retry.start(closedNativeResponse())
+    }
+    assert.equal(native.state.runs, 0)
+    assert.equal(native.state.providerStarts, 0)
+    assert.equal(JSON.parse(await readFile(state.budgetFile, 'utf8')).count, 0)
+  })
+}
 
 test('Ask receives trusted native route context without a current receipt or silent role remap', async () => {
   const state = await temporaryState()

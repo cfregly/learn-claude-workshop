@@ -129,6 +129,7 @@ def build_sdk_client(auth_token: str, client_class: Callable[..., Any]) -> Any:
     """Build one no-retry Bearer client without allowing API key fallback."""
     return client_class(
         auth_token=auth_token,
+        base_url="https://api.anthropic.com",
         default_headers={"anthropic-version": API_VERSION},
         max_retries=0,
         timeout=PROVIDER_TIMEOUT_SECONDS,

@@ -10,9 +10,12 @@ import json
 import sys
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
+from email.message import Message
 from pathlib import Path
 from unittest import mock
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
+from urllib import request as urllib_request
+from urllib.response import addinfourl
 
 
 CLIENT_PATH = Path(__file__).resolve().parents[1] / "public" / "materials" / "claude_api_demo.py"
@@ -41,10 +44,62 @@ class FakeResponse:
 
 
 class ApiClientTests(unittest.TestCase):
+    DUMMY_KEY = "DUMMY_CREDENTIAL_MARKER"
+
+    def run_redirect(self, status: int, target: str):
+        contacted = []
+        authorizations = []
+
+        class MemoryHTTPSHandler(urllib_request.HTTPSHandler):
+            def https_open(self, request):
+                contacted.append(request.full_url)
+                authorizations.append(request.get_header("Authorization"))
+                headers = Message()
+                headers["request-id"] = "req_redirect_test"
+                if request.full_url == demo.API_URL:
+                    headers["Location"] = target
+                    body = {}
+                    response_status = status
+                else:
+                    body = {
+                        "content": [{"type": "text", "text": "Redirect target draft"}],
+                        "stop_reason": "end_turn",
+                    }
+                    response_status = 200
+                response = addinfourl(
+                    io.BytesIO(json.dumps(body).encode()), headers,
+                    request.full_url, response_status,
+                )
+                response.msg = "Synthetic response"
+                return response
+
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            mock.patch.object(urllib_request, "HTTPSHandler", MemoryHTTPSHandler),
+            mock.patch.object(urllib_request, "_opener", None),
+            mock.patch("socket.create_connection", side_effect=AssertionError("External network forbidden")) as network,
+            redirect_stdout(stdout), redirect_stderr(stderr),
+        ):
+            code = demo.make_live_call({"model": "offline-test", "messages": []}, self.DUMMY_KEY)
+        network.assert_not_called()
+        return code, stdout.getvalue(), stderr.getvalue(), contacted, authorizations
+
+    def run_transport(self, key: str, *, response=None, error=None):
+        if response is None:
+            response = FakeResponse({
+                "content": [{"type": "text", "text": "Synthetic draft"}],
+                "stop_reason": "end_turn",
+            })
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with mock.patch.object(demo, "open_without_redirects", return_value=response, side_effect=error) as opener:
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                code = demo.make_live_call({"model": "offline-test", "messages": []}, key)
+        return code, stdout.getvalue(), stderr.getvalue(), opener
+
     def run_body(self, body: dict) -> tuple[int, str, str]:
         stdout = io.StringIO()
         stderr = io.StringIO()
-        with mock.patch.object(demo, "urlopen", return_value=FakeResponse(body)):
+        with mock.patch.object(demo, "open_without_redirects", return_value=FakeResponse(body)):
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = demo.make_live_call({"model": "test-model", "messages": []}, "placeholder-key")
         return exit_code, stdout.getvalue(), stderr.getvalue()
@@ -180,7 +235,7 @@ class ApiClientTests(unittest.TestCase):
         )
         stdout = io.StringIO()
         stderr = io.StringIO()
-        with mock.patch.object(demo, "urlopen", side_effect=error) as urlopen_mock:
+        with mock.patch.object(demo, "open_without_redirects", side_effect=error) as urlopen_mock:
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = demo.make_live_call({"model": "test-model", "messages": []}, "placeholder-key")
         error.close()
@@ -198,6 +253,152 @@ class ApiClientTests(unittest.TestCase):
         output = stdout.getvalue()
         self.assertIn("This local client does not send your environment values to the workshop site.", output)
         self.assertNotIn("never collects or stores", output)
+
+    def test_internal_whitespace_and_controls_are_rejected_before_transport(self) -> None:
+        for character in ("\n", "\r", "\t", " ", "\x00", "\x1f", "\x7f", "\x85"):
+            with self.subTest(character=repr(character)):
+                code, stdout, stderr, opener = self.run_transport(
+                    self.DUMMY_KEY + character + "TAIL"
+                )
+                self.assertEqual(code, demo.EXIT_LIVE_ENV_REQUIRED)
+                opener.assert_not_called()
+                self.assertIn("credential_error=invalid_api_key", stderr)
+                self.assertIn("http_transport_status=not_started", stderr)
+                self.assertNotIn(self.DUMMY_KEY, stdout + stderr)
+
+    def test_surrounding_whitespace_is_stripped_before_authorization_header(self) -> None:
+        code, _stdout, stderr, opener = self.run_transport(" \t" + self.DUMMY_KEY + "\r\n")
+        self.assertEqual(code, 0)
+        self.assertEqual(stderr, "")
+        request = opener.call_args.args[0]
+        self.assertEqual(request.get_header("Authorization"), "Bearer " + self.DUMMY_KEY)
+        self.assertEqual(request.full_url, demo.API_URL)
+        self.assertEqual(opener.call_count, 1)
+
+    def test_cli_rejects_invalid_key_before_live_call(self) -> None:
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            mock.patch.dict(demo.os.environ, {
+                "ANTHROPIC_API_KEY": self.DUMMY_KEY + "\nTAIL",
+                "ANTHROPIC_MODEL": "offline-test",
+            }),
+            mock.patch.object(demo, "make_live_call") as call,
+            redirect_stdout(stdout), redirect_stderr(stderr),
+        ):
+            code = demo.main(["--live"])
+        self.assertEqual(code, demo.EXIT_LIVE_ENV_REQUIRED)
+        call.assert_not_called()
+        self.assertNotIn(self.DUMMY_KEY, stdout.getvalue() + stderr.getvalue())
+
+    def test_cli_passes_only_stripped_key_to_live_call(self) -> None:
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            mock.patch.dict(demo.os.environ, {
+                "ANTHROPIC_API_KEY": " \t" + self.DUMMY_KEY + "\r\n",
+                "ANTHROPIC_MODEL": "offline-test",
+            }),
+            mock.patch.object(demo, "make_live_call", return_value=0) as call,
+            redirect_stdout(stdout), redirect_stderr(stderr),
+        ):
+            code = demo.main(["--live"])
+        self.assertEqual(code, 0)
+        self.assertEqual(call.call_args.args[1], self.DUMMY_KEY)
+        self.assertNotIn(self.DUMMY_KEY, stdout.getvalue() + stderr.getvalue())
+
+    def test_request_preparation_exception_is_sanitized_transport_error(self) -> None:
+        with mock.patch.object(demo, "Request", side_effect=ValueError("Bearer " + self.DUMMY_KEY)):
+            code, stdout, stderr, opener = self.run_transport(self.DUMMY_KEY)
+        self.assertEqual(code, demo.EXIT_RESPONSE_ERROR)
+        opener.assert_not_called()
+        self.assertIn("transport_error=ValueError", stderr)
+        self.assertIn("http_transport_status=transport_error", stderr)
+        self.assertNotIn(self.DUMMY_KEY, stdout + stderr)
+
+    def test_transport_exceptions_never_echo_credential_or_claim_completed(self) -> None:
+        errors = [
+            ValueError("Invalid header value: Bearer " + self.DUMMY_KEY),
+            URLError("Bearer " + self.DUMMY_KEY),
+            TimeoutError(self.DUMMY_KEY),
+            OSError(self.DUMMY_KEY),
+            RuntimeError(self.DUMMY_KEY),
+        ]
+        for error in errors:
+            with self.subTest(error_class=type(error).__name__):
+                code, stdout, stderr, opener = self.run_transport(self.DUMMY_KEY, error=error)
+                self.assertEqual(code, demo.EXIT_RESPONSE_ERROR)
+                self.assertEqual(opener.call_count, 1)
+                self.assertIn("transport_error=" + type(error).__name__, stderr)
+                self.assertIn("http_transport_status=transport_error", stderr)
+                self.assertNotIn("http_transport_status=completed", stderr)
+                self.assertNotIn(self.DUMMY_KEY, stdout + stderr)
+
+    def test_http_error_reason_body_and_request_id_cannot_echo_credential(self) -> None:
+        error = HTTPError(
+            demo.API_URL, 401, "Bearer " + self.DUMMY_KEY,
+            {"request-id": "req_" + self.DUMMY_KEY},
+            io.BytesIO(json.dumps({
+                "request_id": "req_" + self.DUMMY_KEY,
+                "error": {"type": self.DUMMY_KEY, "message": "Bearer " + self.DUMMY_KEY},
+            }).encode()),
+        )
+        try:
+            code, stdout, stderr, opener = self.run_transport(self.DUMMY_KEY, error=error)
+        finally:
+            error.close()
+        self.assertEqual(code, demo.EXIT_RESPONSE_ERROR)
+        self.assertEqual(opener.call_count, 1)
+        self.assertIn("http_status=401", stderr)
+        self.assertIn("error_class=HTTPError", stderr)
+        self.assertIn("request_id=unavailable", stderr)
+        self.assertIn("http_transport_status=http_error", stderr)
+        self.assertNotIn(self.DUMMY_KEY, stdout + stderr)
+
+    def test_invalid_json_is_a_completed_transport_without_ready_draft(self) -> None:
+        response = FakeResponse({})
+        response.raw = b"not-json " + self.DUMMY_KEY.encode()
+        code, stdout, stderr, opener = self.run_transport(self.DUMMY_KEY, response=response)
+        self.assertEqual(code, demo.EXIT_RESPONSE_ERROR)
+        self.assertEqual(opener.call_count, 1)
+        self.assertIn("http_status=200", stderr)
+        self.assertIn("http_transport_status=completed", stderr)
+        self.assertIn("response_error=invalid_json_response", stderr)
+        self.assertIn("error_class=JSONDecodeError", stderr)
+        self.assertIn("request_id=req_offline_test", stderr)
+        self.assertNotIn("ready_for_human_review", stdout + stderr)
+        self.assertNotIn(self.DUMMY_KEY, stdout + stderr)
+
+    def test_response_parse_exception_text_is_never_printed(self) -> None:
+        with mock.patch.object(demo, "parse_json_bytes", side_effect=ValueError(self.DUMMY_KEY)):
+            code, stdout, stderr, _opener = self.run_transport(self.DUMMY_KEY)
+        self.assertEqual(code, demo.EXIT_RESPONSE_ERROR)
+        self.assertIn("http_transport_status=completed", stderr)
+        self.assertIn("error_class=ValueError", stderr)
+        self.assertNotIn(self.DUMMY_KEY, stdout + stderr)
+
+    def test_cross_origin_redirects_are_refused_before_target_contact(self) -> None:
+        target = "https://redirect-target.example.invalid/collect"
+        for status in (301, 302, 303, 307, 308):
+            with self.subTest(status=status):
+                code, stdout, stderr, contacted, authorizations = self.run_redirect(status, target)
+                self.assertEqual(code, demo.EXIT_RESPONSE_ERROR)
+                self.assertEqual(contacted, [demo.API_URL])
+                self.assertEqual(authorizations, ["Bearer " + self.DUMMY_KEY])
+                self.assertEqual(stdout, "")
+                self.assertIn(f"http_status={status}", stderr)
+                self.assertIn("http_transport_status=http_error", stderr)
+                self.assertIn("error_class=HTTPError", stderr)
+                self.assertIn("request_id=req_redirect_test", stderr)
+                self.assertNotIn(self.DUMMY_KEY, stdout + stderr)
+                self.assertNotIn(target, stdout + stderr)
+
+    def test_same_origin_redirect_is_also_refused_without_second_request(self) -> None:
+        target = "https://api.anthropic.com/redirect-target"
+        code, stdout, stderr, contacted, _authorizations = self.run_redirect(302, target)
+        self.assertEqual(code, demo.EXIT_RESPONSE_ERROR)
+        self.assertEqual(contacted, [demo.API_URL])
+        self.assertIn("http_status=302", stderr)
+        self.assertIn("http_transport_status=http_error", stderr)
+        self.assertNotIn(self.DUMMY_KEY, stdout + stderr)
 
 
 if __name__ == "__main__":

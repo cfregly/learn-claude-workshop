@@ -226,6 +226,7 @@ function createFakeClient(environment, options = {}) {
         calls.push({ kind: 'create_skill', params, requestOptions })
         if (options.uploadDeferred) return promiseWithResponse(() => options.uploadDeferred.promise, 'req_skill_create')
         if (options.uploadError) return promiseWithResponse(() => Promise.reject(options.uploadError), 'req_skill_create')
+        if (options.uploadResult) return promiseWithResponse(() => options.uploadResult(), 'req_skill_create')
         return promiseWithResponse(() => ({
           type: 'skill',
           id: 'skill_native_test',
@@ -517,9 +518,117 @@ test('unknown upload outcome is retained without a retry, pin, or Messages call'
     assert.deepEqual(starts, ['skill_upload'])
     assert.deepEqual(calls.map(call => call.kind), ['create_skill'])
     await assert.rejects(lstat(environment.paths.pinFile), { code: 'ENOENT' })
+    const recovery = JSON.parse(await readFile(`${environment.paths.pinFile}.upload-recovery.json`, 'utf8'))
+    assert.equal(recovery.status, 'UPLOAD_RECOVERY_REQUIRED')
+    assert.deepEqual(recovery.provider_request_ids, ['req_unknown'])
+    assert.equal((await environment.core.plan()).reason, 'skill_upload_recovery_required')
   } finally {
     await environment.cleanup()
   }
+})
+
+test('invalid upload responses retain safe identifiers and block another upload', { skip: !PR1_AVAILABLE }, async () => {
+  const environment = await setup()
+  try {
+    const { client, calls } = createFakeClient(environment, {
+      uploadResult: async () => ({
+        type: 'unexpected', id: 'skill_returned', latest_version_id: 'version_returned',
+        raw_secret: 'never-persist-this', source: { type: 'custom' }
+      })
+    })
+    await assert.rejects(environment.core.run({ roleId: 'software-engineer-api', client }), error => {
+      assert.equal(error.code, 'skill_upload_invalid')
+      assert.equal(error.receipt.upload_response.returned.id, 'skill_returned')
+      return true
+    })
+    const file = `${environment.paths.pinFile}.upload-recovery.json`
+    const recoveryText = await readFile(file, 'utf8')
+    const recovery = JSON.parse(recoveryText)
+    assert.equal(recovery.returned.id, 'skill_returned')
+    assert.equal(recovery.returned.latest_version_id, 'version_returned')
+    assert.equal(recovery.provider_request_id, 'req_skill_create')
+    assert.equal(recoveryText.includes('never-persist-this'), false)
+    await assert.rejects(environment.core.run({ roleId: 'software-engineer-api', client }), error => error.code === 'skill_upload_recovery_required')
+    assert.deepEqual(calls.map(call => call.kind), ['create_skill'])
+  } finally { await environment.cleanup() }
+})
+
+test('post-response pin failure keeps a recovery record with returned IDs', { skip: !PR1_AVAILABLE }, async () => {
+  const environment = await setup()
+  try {
+    const { client, calls } = createFakeClient(environment, {
+      uploadResult: async () => {
+        await mkdir(environment.paths.pinFile)
+        return { type: 'skill', id: 'skill_returned', latest_version_id: 'version_returned', source: { type: 'custom' } }
+      }
+    })
+    await assert.rejects(environment.core.run({ roleId: 'software-engineer-api', client }), error => {
+      assert.equal(error.code, 'pin_write_failed')
+      assert.equal(error.receipt.upload_recovery.returned.id, 'skill_returned')
+      return true
+    })
+    const recovery = JSON.parse(await readFile(`${environment.paths.pinFile}.upload-recovery.json`, 'utf8'))
+    assert.equal(recovery.returned.id, 'skill_returned')
+    assert.equal(recovery.returned.latest_version_id, 'version_returned')
+    assert.equal(recovery.provider_request_id, 'req_skill_create')
+    await assert.rejects(environment.core.run({ roleId: 'software-engineer-api', client }), error => error.code === 'skill_upload_recovery_required')
+    assert.deepEqual(calls.map(call => call.kind), ['create_skill'])
+  } finally { await environment.cleanup() }
+})
+
+for (const failure of ['existing_record', 'unavailable_directory']) {
+  test(`upload reservation ${failure} reports the correct error before any provider call`, { skip: !PR1_AVAILABLE }, async () => {
+    const environment = await setup()
+    try {
+      let changed = false
+      const core = createNativeIntegration({
+        paths: environment.paths,
+        timeoutMs: 10_000,
+        makeUpload: async () => {
+          if (!changed) {
+            changed = true
+            if (failure === 'existing_record') {
+              await writeFile(`${environment.paths.pinFile}.upload-recovery.json`, '{"status":"prior_record"}')
+            } else {
+              await rm(environment.paths.stateRoot, { recursive: true })
+              await writeFile(environment.paths.stateRoot, 'not a directory')
+            }
+          }
+          return { name: 'mock-upload' }
+        }
+      })
+      const { client, calls } = createFakeClient(environment)
+      const starts = []
+      await assert.rejects(core.run({
+        roleId: 'software-engineer-api', client,
+        onProviderCallStart: async event => starts.push(event.kind)
+      }), error => {
+        assert.equal(error.code, failure === 'existing_record' ? 'skill_upload_recovery_required' : 'pin_write_failed')
+        assert.match(error.message, /No upload started/)
+        if (failure === 'unavailable_directory') assert.match(error.message, /partial record may remain/)
+        assert.equal(error.receipt.provider_calls_started, 0)
+        return true
+      })
+      assert.deepEqual(starts, [])
+      assert.deepEqual(calls, [])
+    } finally { await environment.cleanup() }
+  })
+}
+
+test('unavailable pin storage fails before MCP or provider work', { skip: !PR1_AVAILABLE }, async () => {
+  const environment = await setup()
+  try {
+    await writeFile(environment.paths.stateRoot, 'not a directory')
+    const { client, calls } = createFakeClient(environment)
+    assert.equal((await environment.core.plan()).enabled, false)
+    await assert.rejects(environment.core.run({ roleId: 'software-engineer-api', client }), error => {
+      assert.equal(error.code, 'pin_unavailable')
+      assert.equal(error.receipt.provider_calls_started, 0)
+      assert.equal(error.receipt.mcp, undefined)
+      return true
+    })
+    assert.deepEqual(calls, [])
+  } finally { await environment.cleanup() }
 })
 
 test('unknown Messages outcome preserves the confirmed pin and started-call accounting without a retry', { skip: !PR1_AVAILABLE }, async () => {

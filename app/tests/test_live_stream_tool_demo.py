@@ -107,9 +107,31 @@ class LiveStreamToolDemoTests(unittest.TestCase):
         self.assertIs(client, client_class.return_value)
         client_class.assert_called_once_with(
             auth_token="synthetic-secret",
+            base_url="https://api.anthropic.com",
             default_headers={"anthropic-version": "2026-10-21"},
             max_retries=0,
             timeout=60.0,
+        )
+        self.assertNotIn("api_key", client_class.call_args.kwargs)
+
+    def test_environment_base_url_cannot_redirect_bearer_client(self) -> None:
+        def fake_client(**options: object) -> SimpleNamespace:
+            return SimpleNamespace(
+                base_url=options.get("base_url")
+                or demo.os.environ.get("ANTHROPIC_BASE_URL"),
+                auth_token=options.get("auth_token"),
+            )
+
+        client_class = mock.Mock(side_effect=fake_client)
+        with mock.patch.dict(
+            demo.os.environ, {"ANTHROPIC_BASE_URL": "https://alternate.example.invalid"}
+        ):
+            client = demo.build_sdk_client("synthetic-secret", client_class)
+
+        self.assertEqual(client.base_url, "https://api.anthropic.com")
+        self.assertEqual(client.auth_token, "synthetic-secret")
+        self.assertEqual(
+            client_class.call_args.kwargs.get("base_url"), "https://api.anthropic.com"
         )
         self.assertNotIn("api_key", client_class.call_args.kwargs)
 

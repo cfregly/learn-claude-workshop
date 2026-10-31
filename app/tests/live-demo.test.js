@@ -152,6 +152,9 @@ test('reports live capability without revealing a credential and keeps health ac
   assert.ok(capability.ask.material_ids.includes('thinking-lab'))
   assert.ok(capability.ask.material_ids.includes('model-capabilities'))
   assert.ok(capability.ask.material_ids.includes('diagnostic-instructor-guide'))
+  assert.ok(capability.ask.material_ids.includes('native-integration'))
+  assert.ok(capability.ask.material_ids.includes('native-integration-code'))
+  assert.ok(capability.ask.material_ids.includes('native-integration-setup'))
   assert.deepEqual(capability.ask.routes, ['home', 'resources', 'approach', 'together', 'streaming', 'diagnose', 'native-integration'])
   assert.deepEqual(capability.ask.diagnostic_case_ids, [
     'healthy_text_renewal',
@@ -317,6 +320,70 @@ test('answers a bounded contextual question with trusted workshop context and qu
 
   const budget = JSON.parse(await readFile(budgetFile, 'utf8'))
   assert.equal(budget.count, 2)
+})
+
+test('accepts native and Python client references for Ask with distinct trusted material summaries', async () => {
+  const budgetFile = await temporaryBudget()
+  const mockedRequests = []
+  let nativeRuns = 0
+  let nativeProviderMethods = 0
+  const unexpectedNativeProviderMethod = async () => {
+    nativeProviderMethods += 1
+    throw new Error('Native provider methods must not run for a material question')
+  }
+  const origin = await startServer({
+    env: {
+      ANTHROPIC_API_KEY: 'server-only-key',
+      ANTHROPIC_MODEL: 'claude-sonnet-5-5',
+      MODEL_BUDGET_FILE: budgetFile
+    },
+    cooldownMs: 0,
+    anthropicClient: {
+      messages: { create: unexpectedNativeProviderMethod },
+      skills: { create: unexpectedNativeProviderMethod, versions: { create: unexpectedNativeProviderMethod } }
+    },
+    nativeIntegration: {
+      plan: async () => ({ enabled: false, reason: 'test_reference_only' }),
+      run: async () => {
+        nativeRuns += 1
+        throw new Error('A material question must not start native execution')
+      }
+    },
+    fetchImpl: async (url, options) => {
+      assert.equal(url, 'https://api.anthropic.com/v1/messages')
+      mockedRequests.push(JSON.parse(options.body))
+      return successResponse('Read the selected reference and keep its evidence boundary in view.')
+    }
+  })
+  const capability = await (await fetch(`${origin}/api/demo`)).json()
+  assert.equal(mockedRequests.length, 0)
+  const cases = [
+    ['native-integration', /historical synthetic in-app run/, /not evidence of a current run/],
+    ['native-integration-code', /source commit c74acd400dbb05243116993ada98f23349616549/, /exactly SKILL\.md, references\/OUTPUT_CONTRACT\.md, scripts\/contract\.py, and scripts\/render_brief\.py/],
+    ['native-integration-setup', /onboarding instructions for environment setup/, /separately authorized upload and model commands/],
+    ['live-stream-tool-code', /official Anthropic Python SDK/, /default command prints an offline plan/]
+  ]
+  for (const [materialId, identity, boundary] of cases) {
+    assert.ok(capability.ask.material_ids.includes(materialId))
+    const response = await ask(origin, {
+      question: 'What does this material explain and what must I do next?',
+      context: { material_id: materialId }
+    })
+    assert.equal(response.status, 200, materialId)
+    assert.equal((await response.json()).status, 'draft', materialId)
+    const prompt = mockedRequests.at(-1).messages[0].content[0].text
+    const selectedMaterial = prompt.split('\n').find(line => line.startsWith('Selected material: '))
+    assert.match(selectedMaterial, identity, materialId)
+    assert.match(selectedMaterial, boundary, materialId)
+    assert.match(selectedMaterial, /no current .*receipt/, materialId)
+    for (const [otherId, otherIdentity] of cases) {
+      if (otherId !== materialId) assert.doesNotMatch(selectedMaterial, otherIdentity, materialId)
+    }
+  }
+  assert.equal(mockedRequests.length, 4)
+  assert.equal(nativeRuns, 0)
+  assert.equal(nativeProviderMethods, 0)
+  assert.equal(JSON.parse(await readFile(budgetFile, 'utf8')).count, 4)
 })
 
 test('quotes deliberate selected content as untrusted data while preserving the role goal', async () => {

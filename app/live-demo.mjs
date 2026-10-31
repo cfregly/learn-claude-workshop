@@ -60,6 +60,9 @@ const CASES = {
 }
 
 const MATERIAL_SUMMARIES = Object.freeze({
+  'native-integration': 'The prepared native integration guide explains the read-only MCP lookup, application authorization, exact native Skill pin, and source-bound renewal brief. It records one historical synthetic in-app run and links to standalone onboarding. That historical description is not evidence of a current run. Reading this guide does not start the native integration, and this material supplies no current MCP, provider, or execution receipt.',
+  'native-integration-code': 'The native Skill payload is pinned to source commit c74acd400dbb05243116993ada98f23349616549 and contains exactly SKILL.md, references/OUTPUT_CONTRACT.md, scripts/contract.py, and scripts/render_brief.py. These are the packaged instructions, output contract, and deterministic renderer code. Standalone installation and upload instructions live in the separate setup README. Inspecting this payload does not execute it, and the material supplies no current native run receipt.',
+  'native-integration-setup': 'The standalone native Skill setup README contains the workshop onboarding instructions for environment setup, package installation, offline checks, and separately authorized upload and model commands. Follow its current commands and prerequisites rather than treating the pinned four-file payload as installation instructions. Reading this README does not upload a Skill or start native execution. It supplies no current provider or execution receipt, and standalone CLI evidence is separate from historical in-app evidence.',
   'hooks-lab': 'The direct Messages API has no general lifecycle-hook registry. Application-owned dispatch checks authenticated caller scope before execution. Claude Code and Agent SDK lifecycle hooks are separate surfaces with event- and version-specific failure behavior. Before-tool checks can affect pending dispatch. After-tool records cannot undo a committed action. HTTP middleware observes HTTP, and service webhooks are asynchronous notifications rather than synchronous tool authorization. Enterprise inference hooks are a separate governed surface. Inspect the exact selected runtime and supported failure policy, preserve downstream authorization, and reconcile confirmed actions before retry.',
   'hook-dispatcher': 'The standard-library Python dispatcher is synthetic and offline. It checks authenticated caller account scope before source access or action, ignores model-supplied approval overrides, returns a receipt only for one committed mock write, and uses an explicit application-owned block-on-timeout policy. Its after-action logging failure leaves the saved write confirmed. This does not claim actual Claude Code or Agent SDK hook execution.',
   'renewal-skill': 'The reviewed renewal-brief SKILL.md contains when-to-use metadata and a procedure for extracting source-bound facts, preserving unknown approvals and conflicts, proposing internal actions with named owners, and requiring human review. It is procedural knowledge, not changing customer memory, permission, or proof of execution. The API Skill IDs in the guide are synthetic placeholders.',
@@ -69,7 +72,7 @@ const MATERIAL_SUMMARIES = Object.freeze({
   facilitator: 'The facilitator guide starts with the shared workflow, splits learners into role-relevant work, announces a return point, and uses teach-back evidence to decide whether to continue or revisit a concept.',
   security: 'The security activity separates application authorization from Claude API authentication. Learners inspect approved data, retention, regional processing, failure handling, reproducibility, and cost before deciding whether a request may enter a pilot.',
   'api-client': 'The direct API client builds a bounded Messages API request on the server. It reads the key and model from server configuration, filters typed text blocks, records safe request metadata, and does not treat invocation success as permission or business approval.',
-  notebook: 'The offline notebook traces account access before source selection, a typed Messages API request and response, streaming events, stop reasons, tool boundaries, and common failures without requiring a key or network call.',
+  notebook: 'Prepared Markdown and code, saved without outputs. Nothing runs in this browser.',
   'renewal-code': 'The Claude Code practice repository contains a renewal-window defect. The requirement includes days 0 through 30, so the boundary comparison and its day-30 test must be reviewed before merge.',
   fixtures: 'The four synthetic evaluation fixtures cover the baseline, conflicting renewal dates, an unsupported SSO claim, and an instruction embedded inside an untrusted source.',
   'claude-for-work': 'The Claude for Work activity uses an approved private Project, the four synthetic records, a role-specific task, and human source review. Organization access, sharing, and connected-source permissions remain separate controls.',
@@ -78,7 +81,7 @@ const MATERIAL_SUMMARIES = Object.freeze({
   'thinking-lab': 'Thinking capability and thinking behavior depend on the selected model. Effort changes how much the model thinks, while the output budget is the ceiling and thinking tokens count toward it. Omitting thinking from the displayed response does not save the thinking-token cost. Model progress narration is text, not evidence that an external action ran. When a tool turn continues, required thinking blocks and their signatures must be passed back unchanged.',
   'model-capabilities': 'The prepared model-capability snapshot was observed on October 25, 2026. It is read-only course material, not live provider, account, entitlement, or availability state. In that snapshot, Sonnet 5.5 supports adaptive thinking and between_tools. It does not support disabled or enabled thinking. Opus 5.5 supports only adaptive thinking among those four modes. Capability still does not predict the amount of thinking a particular request will use.',
   'live-stream-tool': 'The live streaming and tool-use guide explains the bounded POST /api/workflow teaching route. The browser sends only an allowlisted role. The server fixes the synthetic Northstar account and model, checks shared admission limits before opening an event stream, and makes at most two Claude Messages calls. The first response must contain exactly one validated lookup_northstar_account call. The application checks a synthetic teaching identity before returning fixed read-only source records. The second call receives the complete assistant turn and the matching tool result. Only final-answer text deltas reach the learner. A complete event requires message_stop with end_turn. Any partial, invalid, timed-out, or disconnected provider stream remains incomplete and review-required.',
-  'live-stream-tool-code': 'The live workflow code uses the official Anthropic TypeScript SDK with Bearer authToken and automatic retries disabled. Sonnet 5.5 keeps thinking type between_tools and no forced tool choice. The server passes every assistant content block from the first turn back unchanged, including opaque thinking signatures, but never sends thinking content, signatures, credentials, or raw provider errors to the browser. The fixed lookup handler accepts only northstar-freight, exposes four approved synthetic source records, and preserves discount approval as unknown. The SSE client must wait for complete rather than treating HTTP 200 or visible text as success.',
+  'live-stream-tool-code': 'The standalone streaming client uses the official Anthropic Python SDK. Its default command prints an offline plan without importing the SDK, reading credentials, calling a tool, or making a network request. Explicit --live mode uses at most two Messages streams with the official Anthropic origin, Bearer authentication, and automatic retries disabled. It validates one lookup_northstar_account request before a local read-only synthetic Northstar lookup, then passes every first-turn assistant block and matching tool result into the second request. Both streams must reach message_stop, and the final response must end with end_turn and contain draft text with no further tool request. Interrupted or invalid work remains incomplete. A completed generation still requires human source review and does not establish business acceptance. This material supplies no current CLI execution receipt.',
   'diagnostic-instructor-guide': 'The instructor guide uses eight fixed synthetic packets to trace direct Claude API streaming across the API transport, backend parser and relay, browser network path, UI adapter, and client tool boundary. It keeps observed evidence separate from a completed reference, identifies the first unconfirmed boundary, and uses opaque correlation labels only to join one synthetic trace.'
 })
 
@@ -848,6 +851,27 @@ function nativeProviderRequestIds(value) {
   return result
 }
 
+function compactNativeUploadRecovery(value) {
+  if (!value || !['create_skill', 'create_version'].includes(value.operation)) return null
+  const safeToken = item => {
+    const text = textValue(item, 300)
+    return text && /^[A-Za-z0-9_.-]+$/.test(text) && !/sk-ant-|bearer|api[_-]?key|authorization/i.test(text) ? text : null
+  }
+  const returned = {}
+  for (const key of ['id', 'skill_id', 'latest_version_id', 'name', 'type']) {
+    const text = safeToken(value.returned?.[key])
+    if (text) returned[key] = text
+  }
+  return {
+    status: 'requires_reconciliation',
+    operation: value.operation,
+    provider_request_id: safeToken(value.provider_request_id),
+    returned,
+    retry_attempted: false,
+    raw_response_persisted: false
+  }
+}
+
 function compactNativeProof(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const flags = [
@@ -915,11 +939,12 @@ function nativeFailure(error, abortKind = null) {
   const code = textValue(error?.code, 120) || 'native_integration_failed'
   const messages = {
     native_skill_busy: 'Another Skill pin update is already running. No provider call was added to a queue.',
+    skill_upload_recovery_required: 'A prior Skill upload needs workspace reconciliation before another run. No retry was made.',
+    pin_write_failed: 'The private Skill state could not be saved safely. Preserve any partial recovery record for a facilitator to check.',
     runtime_dependencies_missing: 'The reviewed native runtime dependencies are unavailable.',
     bundle_invalid: 'The reviewed Skill bundle did not pass inspection.',
     bundle_drift: 'The reviewed Skill bundle changed after inspection. No retry was made.',
     pin_invalid: 'The saved Skill pin is invalid. No provider lookup or delete fallback was attempted.',
-    pin_write_failed: 'The confirmed Skill pin could not be saved safely. The run is incomplete.',
     skill_upload_invalid: 'The provider did not return a valid custom Skill pin. The run is incomplete.',
     message_receipt_invalid: 'The Messages request did not return a usable request receipt. The run is incomplete.',
     provider_access_denied: 'The current credential or workspace permission did not allow the native operation.',
@@ -1756,6 +1781,8 @@ export function createLiveDemo(options = {}) {
       return errorResult(429, 'live_demo_busy', 'Two live examples are already running. Try again shortly.', traceId)
     }
 
+    inFlight += 1
+    clientCalls.set(client, timestamp)
     let executionPlan
     try {
       executionPlan = await nativeIntegration.plan()
@@ -1765,22 +1792,22 @@ export function createLiveDemo(options = {}) {
     const callsRequired = [1, 2].includes(executionPlan?.calls_required) ? executionPlan.calls_required : null
     if (executionPlan?.enabled !== true || typeof executionPlan.upload_required !== 'boolean' || callsRequired === null) {
       const reason = textValue(executionPlan?.reason, 120) || 'runtime_dependencies_missing'
+      inFlight -= 1
+      if (clientCalls.get(client) === timestamp) clientCalls.delete(client)
       return errorResult(503, reason, nativeFailure({ code: reason }).message, traceId)
     }
 
-    inFlight += 1
-    clientCalls.set(client, timestamp)
     let reservation
     try {
       reservation = await reserveBudget(timestamp, callsRequired)
     } catch {
       inFlight -= 1
-      clientCalls.delete(client)
+      if (clientCalls.get(client) === timestamp) clientCalls.delete(client)
       return errorResult(503, 'usage_budget_unavailable', 'The shared provider-call budget cannot be checked safely. No native run started.', traceId)
     }
     if (!reservation.allowed) {
       inFlight -= 1
-      clientCalls.delete(client)
+      if (clientCalls.get(client) === timestamp) clientCalls.delete(client)
       return errorResult(429, 'native_budget_insufficient', `Fewer than ${callsRequired} provider calls remain today. No native run started.`, traceId)
     }
 
@@ -1838,7 +1865,7 @@ export function createLiveDemo(options = {}) {
           }
           if (isWritableResponse(response)) response.end()
         }
-        const receiptRecord = ({ status, providerRequestIds = [], proof = null, output = null, providerResponse = null, error = null }) => ({
+        const receiptRecord = ({ status, providerRequestIds = [], proof = null, output = null, providerResponse = null, uploadRecovery = null, error = null }) => ({
           schema_version: 1,
           status,
           trace_id: traceId,
@@ -1871,6 +1898,7 @@ export function createLiveDemo(options = {}) {
           raw_response_persisted: false,
           thinking_persisted: false,
           ...(providerResponse ? { provider_response: providerResponse } : {}),
+          ...(uploadRecovery ? { upload_recovery: uploadRecovery } : {}),
           error,
           persisted_at: new Date(now()).toISOString()
         })
@@ -1992,6 +2020,7 @@ export function createLiveDemo(options = {}) {
           const rawPartialProof = errorReceipt?.proof?.skill_access_proof || errorReceipt?.skill_access_proof || errorReceipt?.proof
           const proof = compactNativeProof(rawPartialProof)
           const providerResponse = compactNativeProviderResponse(errorReceipt?.message || errorReceipt?.proof?.response)
+          const uploadRecovery = compactNativeUploadRecovery(errorReceipt?.upload_recovery)
           const errorData = {
             code: failure.code,
             message: failure.message,
@@ -2004,6 +2033,7 @@ export function createLiveDemo(options = {}) {
               proof,
               output: null,
               providerResponse,
+              uploadRecovery,
               error: errorData
             }))
           } catch (receiptError) {
@@ -2025,7 +2055,8 @@ export function createLiveDemo(options = {}) {
               ...(observed.mcp ? { mcp: observed.mcp } : {}),
               ...(observed.skill ? { skill: observed.skill } : {}),
               ...(proof ? { proof } : {}),
-              ...(providerResponse ? { provider_response: providerResponse } : {})
+              ...(providerResponse ? { provider_response: providerResponse } : {}),
+              ...(uploadRecovery ? { upload_recovery: uploadRecovery } : {})
             })
           }
           finished = true

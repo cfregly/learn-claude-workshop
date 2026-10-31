@@ -4,6 +4,7 @@ import {
   access,
   lstat,
   mkdir,
+  open,
   readFile,
   realpath,
   rename,
@@ -504,11 +505,33 @@ async function readPin(paths) {
   return pin
 }
 
+function uploadRecoveryFile(paths) {
+  return `${paths.pinFile}.upload-recovery.json`
+}
+
+async function requireNoUploadRecovery(paths) {
+  try {
+    await lstat(uploadRecoveryFile(paths))
+  } catch (error) {
+    if (error?.code === 'ENOENT') return
+    throw new NativeIntegrationError('pin_unavailable', 'The upload recovery record could not be inspected.', { stage: 'plan', partial: false })
+  }
+  if (pinMutations.has(paths.pinFile)) {
+    throw new NativeIntegrationError('native_skill_busy', 'Another native Skill pin change is already running.', { stage: 'admission', partial: false })
+  }
+  throw new NativeIntegrationError('skill_upload_recovery_required', 'Reconcile the private upload recovery record with the workspace before another upload.', { stage: 'plan', partial: false })
+}
+
 async function writePin(paths, pin, uuid) {
-  await mkdir(paths.stateRoot, { recursive: true, mode: 0o750 })
-  const root = await realpath(paths.stateRoot)
-  const parent = await realpath(path.dirname(paths.pinFile))
-  if (!isWithin(parent, root)) throw new NativeIntegrationError('pin_write_failed', 'The private Skill pin path escaped its state directory.', { stage: 'skill_upload' })
+  let parent
+  try {
+    await mkdir(paths.stateRoot, { recursive: true, mode: 0o750 })
+    const root = await realpath(paths.stateRoot)
+    parent = await realpath(path.dirname(paths.pinFile))
+    if (!isWithin(parent, root)) throw new Error('unsafe parent')
+  } catch (error) {
+    throw new NativeIntegrationError('pin_write_failed', 'The private Skill state directory is unavailable.', { stage: 'skill_upload', cause: error })
+  }
   try {
     const existing = await lstat(paths.pinFile)
     if (!existing.isFile() || existing.isSymbolicLink()) throw new Error('invalid')
@@ -517,11 +540,67 @@ async function writePin(paths, pin, uuid) {
   }
   const temporary = `${paths.pinFile}.${process.pid}.${uuid()}.tmp`
   try {
-    await writeFile(temporary, `${JSON.stringify(pin)}\n`, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
+    const file = await open(temporary, 'wx', 0o600)
+    try {
+      await file.writeFile(`${JSON.stringify(pin)}\n`, 'utf8')
+      await file.sync()
+    } finally {
+      await file.close()
+    }
     await rename(temporary, paths.pinFile)
+    const directory = await open(parent, 'r')
+    try { await directory.sync() } finally { await directory.close() }
   } catch (error) {
     await unlink(temporary).catch(() => {})
     throw new NativeIntegrationError('pin_write_failed', 'The confirmed Skill pin could not be saved safely.', { stage: 'skill_upload', cause: error })
+  }
+}
+
+async function checkPinWritable(paths) {
+  const probe = `${paths.pinFile}.${randomUUID()}.probe`
+  try {
+    await writePin({ ...paths, pinFile: probe }, { schema_version: 1, status: 'write_probe' }, randomUUID)
+    await unlink(probe)
+  } catch (error) {
+    await unlink(probe).catch(() => {})
+    throw new NativeIntegrationError('pin_write_failed', 'The private Skill state cannot be written before upload.', { stage: 'plan', partial: false, cause: error })
+  }
+}
+
+async function reserveUploadRecovery(paths, record) {
+  let file
+  try {
+    file = await open(uploadRecoveryFile(paths), 'wx', 0o600)
+    await file.writeFile(`${JSON.stringify(record)}\n`, 'utf8')
+    await file.sync()
+    await file.close()
+    file = null
+    const directory = await open(path.dirname(paths.pinFile), 'r')
+    try { await directory.sync() } finally { await directory.close() }
+  } catch (error) {
+    await file?.close().catch(() => {})
+    const existing = error?.code === 'EEXIST'
+    throw new NativeIntegrationError(
+      existing ? 'skill_upload_recovery_required' : 'pin_write_failed',
+      existing
+        ? 'An existing upload recovery record blocks this run. No upload started.'
+        : 'The upload recovery record could not be saved. No upload started. A partial record may remain and must be preserved for reconciliation.',
+      { stage: 'skill_upload', partial: false, cause: error }
+    )
+  }
+}
+
+function safeUploadResponse(data, requestId, operation) {
+  const fields = ['id', 'skill_id', 'latest_version_id', 'name', 'type']
+  const safeToken = value => {
+    const text = textValue(value, 300)
+    return text && /^[A-Za-z0-9_.-]+$/.test(text) && !/sk-ant-|bearer|api[_-]?key|authorization/i.test(text) ? text : null
+  }
+  return {
+    operation,
+    provider_request_id: safeToken(requestId),
+    returned: Object.fromEntries(fields.map(key => [key, safeToken(data?.[key])]).filter(([, value]) => value)),
+    raw_response_persisted: false
   }
 }
 
@@ -688,8 +767,10 @@ export function createNativeIntegration(options = {}) {
     await trustedRegularFile(paths.mcpServer, labsRoot)
     await trustedRegularFile(paths.fixture, labsRoot)
     const manifest = await inspectBundle(signal)
+    await requireNoUploadRecovery(paths)
     const pin = await readPin(paths)
     const pinState = !pin ? 'missing' : manifestsMatch(pin, manifest) ? 'current' : 'stale'
+    if (pinState !== 'current') await checkPinWritable(paths)
     return {
       status: 'ready',
       enabled: true,
@@ -764,6 +845,7 @@ export function createNativeIntegration(options = {}) {
     const traceId = textValue(suppliedTraceId, 200) || `native_${uuid()}`
     let providerCallsStarted = 0
     let lockHeld = false
+    let uploadRecovery = null
     let receipt = {
       schema_version: 1,
       status: 'started',
@@ -823,6 +905,20 @@ export function createNativeIntegration(options = {}) {
       let pinReused = executionPlan.pin_state === 'current'
       if (!pinReused) {
         const uploads = await prepareUploads(paths, executionPlan.manifest, makeUpload)
+        const operation = executionPlan.pin_state === 'missing' ? 'create_skill' : 'create_version'
+        const recovery = {
+          schema_version: 1,
+          status: 'UPLOAD_PENDING_RECONCILIATION',
+          operation,
+          trace_id: traceId,
+          bundle_sha256: executionPlan.manifest.bundle_sha256,
+          previous_skill_id: textValue(executionPlan.pin?.skill_id, 300),
+          previous_version: textValue(executionPlan.pin?.version, 300),
+          retry_attempted: false,
+          raw_response_persisted: false
+        }
+        await reserveUploadRecovery(paths, recovery)
+        uploadRecovery = recovery
         await startProviderCall('skill_upload')
         let response
         try {
@@ -837,7 +933,10 @@ export function createNativeIntegration(options = {}) {
         const data = response?.data
         const requestId = textValue(response?.request_id, 300)
         if (requestId) receipt = { ...receipt, provider_request_ids: [...receipt.provider_request_ids, requestId] }
-        const operation = executionPlan.pin_state === 'missing' ? 'create_skill' : 'create_version'
+        const returned = safeUploadResponse(data, requestId, operation)
+        receipt = { ...receipt, upload_response: returned }
+        uploadRecovery = { ...uploadRecovery, status: 'UPLOAD_RESPONSE_REQUIRES_VALID_PIN', ...returned }
+        await writePin({ ...paths, pinFile: uploadRecoveryFile(paths) }, uploadRecovery, uuid)
         const skillId = operation === 'create_skill' ? data?.id : data?.skill_id
         const version = operation === 'create_skill' ? data?.latest_version_id : data?.id
         const valid = operation === 'create_skill'
@@ -862,6 +961,8 @@ export function createNativeIntegration(options = {}) {
           pinned_at: new Date().toISOString()
         }
         await writePin(paths, pin, uuid)
+        await unlink(uploadRecoveryFile(paths))
+        uploadRecovery = null
       }
       receipt = { ...receipt, evidence_state: 'skill_pinned', skill_pin: safePinReceipt(pin, pinReused) }
       await emitEvent(emit, 'skill_pinned', {
@@ -963,6 +1064,23 @@ export function createNativeIntegration(options = {}) {
       })
       return receipt
     } catch (error) {
+      if (uploadRecovery) {
+        const failureReceipt = error?.receipt || receipt
+        uploadRecovery = {
+          ...uploadRecovery,
+          status: 'UPLOAD_RECOVERY_REQUIRED',
+          provider_request_ids: failureReceipt.provider_request_ids || [],
+          provider_calls_started: providerCallsStarted,
+          failed_code: textValue(error?.code, 120) || 'pin_write_failed'
+        }
+        try {
+          await writePin({ ...paths, pinFile: uploadRecoveryFile(paths) }, uploadRecovery, uuid)
+        } catch {
+          receipt = { ...receipt, upload_recovery_write_failed: true }
+        }
+        receipt = { ...receipt, upload_recovery: uploadRecovery }
+        if (error instanceof NativeIntegrationError) error.receipt = { ...receipt, ...(error.receipt || {}), upload_recovery: uploadRecovery }
+      }
       if (error instanceof NativeIntegrationError) {
         if (!error.receipt) error.receipt = { ...receipt, status: 'error', provider_calls_started: providerCallsStarted }
         throw error

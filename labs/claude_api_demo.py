@@ -6,11 +6,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 API_URL = "https://api.anthropic.com/v1/messages"
@@ -52,6 +53,20 @@ SYSTEM_INSTRUCTIONS = (
 
 class AccessDenied(RuntimeError):
     """Raised before account facts are selected."""
+
+
+class RefuseRedirects(HTTPRedirectHandler):
+    """Keep a credentialed API request on its original URL without a retry."""
+
+    def redirect_request(
+        self, request: Request, response: Any, code: int, message: str,
+        headers: Any, new_url: str,
+    ) -> None:
+        raise HTTPError(request.full_url, code, "Redirect refused", headers, response)
+
+
+def open_without_redirects(request: Request, timeout: float) -> Any:
+    return build_opener(RefuseRedirects()).open(request, timeout=timeout)
 
 
 @dataclass(frozen=True)
@@ -122,12 +137,47 @@ def print_dry_run_instructions() -> None:
     print("This local client does not send your environment values to the workshop site.")
 
 
-def request_id_from(headers: Any, body: dict[str, Any] | None = None) -> str:
-    header_value = headers.get("request-id") if headers else None
-    if header_value:
-        return str(header_value)
-    if body and body.get("request_id"):
-        return str(body["request_id"])
+def normalize_api_key(api_key: Any) -> str | None:
+    """Accept one printable ASCII credential token after trimming its edges."""
+    if not isinstance(api_key, str):
+        return None
+    normalized = api_key.strip()
+    if not normalized or any(not 33 <= ord(character) <= 126 for character in normalized):
+        return None
+    return normalized
+
+
+def print_credential_error() -> None:
+    print("credential_error=invalid_api_key", file=sys.stderr)
+    print("error=ANTHROPIC_API_KEY must be one printable ASCII token", file=sys.stderr)
+    print("http_transport_status=not_started", file=sys.stderr)
+
+
+def safe_error_class(error: Exception, api_key: str) -> str:
+    name = type(error).__name__
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,79}", name) and api_key not in name:
+        return name
+    return "Error"
+
+
+def safe_http_status(value: Any) -> int | str:
+    return value if type(value) is int and 100 <= value <= 599 else "unavailable"
+
+
+def request_id_from(
+    headers: Any, body: dict[str, Any] | None = None, *, api_key: str = ""
+) -> str:
+    try:
+        header_value = headers.get("request-id") if headers else None
+    except Exception:
+        header_value = None
+    for value in (header_value, body.get("request_id") if body else None):
+        if (
+            isinstance(value, str)
+            and re.fullmatch(r"req[_-][A-Za-z0-9_-]{1,200}", value)
+            and (not api_key or api_key not in value)
+        ):
+            return value
     return "unavailable"
 
 
@@ -281,50 +331,56 @@ def classify_response(body: dict[str, Any]) -> ResponseClassification:
 
 
 def make_live_call(payload: dict[str, Any], api_key: str) -> int:
-    request = Request(
-        API_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "anthropic-version": API_VERSION,
-            "content-type": "application/json",
-        },
-    )
-
+    normalized_key = normalize_api_key(api_key)
+    if normalized_key is None:
+        print_credential_error()
+        return EXIT_LIVE_ENV_REQUIRED
+    api_key = normalized_key
     try:
-        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        request = Request(
+            API_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "anthropic-version": API_VERSION,
+                "content-type": "application/json",
+            },
+        )
+        with open_without_redirects(request, timeout=TIMEOUT_SECONDS) as response:
             raw = response.read(MAX_RESPONSE_BYTES + 1)
             response_headers = response.headers
-            response_status = getattr(response, "status", 200)
-            if len(raw) > MAX_RESPONSE_BYTES:
-                print("mode=live")
-                print(f"http_status={response_status}")
-                print("http_transport_status=completed")
-                print("error=response_too_large", file=sys.stderr)
-                print(f"request_id={request_id_from(response_headers)}")
-                return EXIT_RESPONSE_ERROR
-            body = parse_json_bytes(raw)
+            response_status = safe_http_status(getattr(response, "status", 200))
     except HTTPError as exc:
-        raw = exc.read(MAX_RESPONSE_BYTES)
         try:
-            body = parse_json_bytes(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            body = parse_json_bytes(exc.read(MAX_RESPONSE_BYTES))
+        except Exception:
             body = {}
-        error = body.get("error") if isinstance(body.get("error"), dict) else {}
-        print(f"http_status={exc.code}", file=sys.stderr)
-        print(f"error_type={error.get('type', 'unknown')}", file=sys.stderr)
-        print(f"error_message={error.get('message', exc.reason)}", file=sys.stderr)
-        print(f"request_id={request_id_from(exc.headers, body)}", file=sys.stderr)
+        print(f"http_status={safe_http_status(exc.code)}", file=sys.stderr)
+        print(f"error_class={safe_error_class(exc, api_key)}", file=sys.stderr)
+        print(f"request_id={request_id_from(exc.headers, body, api_key=api_key)}", file=sys.stderr)
         print("http_transport_status=http_error", file=sys.stderr)
         return EXIT_RESPONSE_ERROR
-    except (URLError, TimeoutError) as exc:
-        print(f"network_error={exc}", file=sys.stderr)
+    except Exception as exc:
+        print(f"transport_error={safe_error_class(exc, api_key)}", file=sys.stderr)
         print("http_transport_status=transport_error", file=sys.stderr)
         return EXIT_RESPONSE_ERROR
-    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+
+    if len(raw) > MAX_RESPONSE_BYTES:
+        print("mode=live")
+        print(f"http_status={response_status}")
+        print("http_transport_status=completed")
+        print("error=response_too_large", file=sys.stderr)
+        print(f"request_id={request_id_from(response_headers, api_key=api_key)}")
+        return EXIT_RESPONSE_ERROR
+    try:
+        body = parse_json_bytes(raw)
+    except Exception as exc:
+        print(f"http_status={response_status}", file=sys.stderr)
         print("http_transport_status=completed", file=sys.stderr)
-        print(f"response_error={exc}", file=sys.stderr)
+        print("response_error=invalid_json_response", file=sys.stderr)
+        print(f"error_class={safe_error_class(exc, api_key)}", file=sys.stderr)
+        print(f"request_id={request_id_from(response_headers, api_key=api_key)}", file=sys.stderr)
         return EXIT_RESPONSE_ERROR
 
     classification = classify_response(body)
@@ -336,7 +392,7 @@ def make_live_call(payload: dict[str, Any], api_key: str) -> int:
     for index, block_text in enumerate(classification.text_blocks, start=1):
         print(f"text_block_{index}={block_text}")
     print(f"stop_reason={classification.stop_reason}")
-    print(f"request_id={request_id_from(response_headers, body)}")
+    print(f"request_id={request_id_from(response_headers, body, api_key=api_key)}")
     usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
     print(f"token_usage={json.dumps(usage, sort_keys=True)}")
     print(f"generation_status={classification.generation_status}")
@@ -366,9 +422,12 @@ def main(argv: list[str] | None = None) -> int:
     api_key = ""
 
     if args.live:
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        api_key = normalize_api_key(os.environ.get("ANTHROPIC_API_KEY", ""))
         model = os.environ.get("ANTHROPIC_MODEL", "")
-        if not api_key or not model:
+        if api_key is None:
+            print_credential_error()
+            return EXIT_LIVE_ENV_REQUIRED
+        if not model:
             print("error=--live requires ANTHROPIC_API_KEY and ANTHROPIC_MODEL in the learner environment", file=sys.stderr)
             return EXIT_LIVE_ENV_REQUIRED
 
